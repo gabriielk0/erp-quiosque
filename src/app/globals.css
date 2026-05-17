@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --accent: 214 89% 52%;
+    --accent-fg: 0 0% 100%;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: 'Outfit', sans-serif; }
+  .font-display { font-family: 'DM Serif Display', serif; }
+  .font-mono { font-family: 'DM Mono', monospace; }
+  .font-body { font-family: 'Outfit', sans-serif; }
+}
+
+@layer components {
+  .card {
+    @apply bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 rounded-2xl shadow-sm;
+  }
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-xl transition-all duration-150 active:scale-95;
+  }
+  .btn-ghost {
+    @apply bg-transparent hover:bg-stone-100 dark:hover:bg-neutral-800 text-stone-700 dark:text-stone-300 font-medium px-4 py-2 rounded-xl transition-all duration-150;
+  }
+  .btn-danger {
+    @apply bg-red-50 hover:bg-red-100 dark:bg-red-950 dark:hover:bg-red-900 text-red-600 dark:text-red-400 font-medium px-4 py-2 rounded-xl transition-all duration-150;
+  }
+  .input {
+    @apply w-full bg-stone-50 dark:bg-neutral-800 border border-stone-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all;
+  }
+  .label {
+    @apply block text-xs font-medium text-stone-500 dark:text-stone-400 mb-1;
+  }
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; }
+.dark ::-webkit-scrollbar-thumb { background: #404040; }
+
+/* Animations */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.animate-in { animation: fadeIn 0.25s ease forwards; }
