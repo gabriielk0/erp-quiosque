@@ -311,6 +311,7 @@ export function useStore() {
       });
     } catch (error) {
       console.error('Erro ao excluir venda:', error);
+      alert(`Erro ao excluir venda: ${error.message}`);
     }
   }, []);
 
