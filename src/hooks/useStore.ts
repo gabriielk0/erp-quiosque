@@ -49,44 +49,46 @@ const mapInsumo = (raw: any): Insumo => ({
   criadoEm: String(raw.criadoEm),
 });
 
-const mapProduto = (raw: any): Produto => ({
-  id: String(raw.id),
-  nome: raw.nome,
-  categoria: raw.categoria ?? '',
-  descricao: raw.descricao ?? undefined,
-  margemLucro: Number(raw.margemSeguranca ?? raw.margemLucro ?? 10),
-  precoVenda:
-    raw.precoVenda !== null && raw.precoVenda !== undefined
-      ? Number(raw.precoVenda)
-      : undefined,
-  precoIfood:
-    raw.precoIfood !== null && raw.precoIfood !== undefined
-      ? Number(raw.precoIfood)
-      : undefined,
-  disponivelIfood: raw.disponivelIfood ?? true,
-  ativo: Boolean(raw.ativo),
-  insumos: Array.isArray(raw.insumos)
-    ? raw.insumos.map((item: any) => ({
-        insumoId: String(item.insumoId),
-        quantidade: Number(item.qtdBruta ?? item.quantidade ?? 0),
-      }))
-    : [],
-  criadoEm: String(raw.criadoEm),
-});
+const mapProduto = (raw: any): Produto =>
+  ({
+    id: String(raw.id),
+    nome: raw.nome,
+    categoria: raw.categoria ?? '',
+    descricao: raw.descricao ?? undefined,
+    margemLucro: Number(raw.margemSeguranca ?? raw.margemLucro ?? 10),
+    precoVenda:
+      raw.precoVenda !== null && raw.precoVenda !== undefined
+        ? Number(raw.precoVenda)
+        : undefined,
+    precoIfood:
+      raw.precoIfood !== null && raw.precoIfood !== undefined
+        ? Number(raw.precoIfood)
+        : undefined,
+    disponivelIfood: raw.disponivelIfood ?? true,
+    ativo: Boolean(raw.ativo),
+    insumos: Array.isArray(raw.insumos)
+      ? raw.insumos.map((item: any) => ({
+          insumoId: String(item.insumoId),
+          quantidade: Number(item.qtdBruta ?? item.quantidade ?? 0),
+        }))
+      : [],
+    criadoEm: String(raw.criadoEm),
+  }) as any;
 
-const mapVenda = (raw: any): Venda => ({
-  id: String(raw.id),
-  total: Number(raw.total),
-  canal: raw.canal ?? 'salao',
-  criadaEm: String(raw.criadaEm),
-  itens: Array.isArray(raw.itens)
-    ? raw.itens.map((item: any) => ({
-        produtoId: String(item.produtoId),
-        quantidade: Number(item.quantidade),
-        precoUnitario: Number(item.precoUnitario),
-      }))
-    : [],
-});
+const mapVenda = (raw: any): Venda =>
+  ({
+    id: String(raw.id),
+    total: Number(raw.total),
+    canal: raw.canal ?? 'salao',
+    criadaEm: String(raw.criadaEm),
+    itens: Array.isArray(raw.itens)
+      ? raw.itens.map((item: any) => ({
+          produtoId: String(item.produtoId),
+          quantidade: Number(item.quantidade),
+          precoUnitario: Number(item.precoUnitario),
+        }))
+      : [],
+  }) as any;
 
 const prepareInsumoBody = (insumo: Omit<Insumo, 'id' | 'criadoEm'>) => ({
   nome: insumo.nome,
