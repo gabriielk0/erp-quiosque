@@ -9,6 +9,7 @@ const links = [
   { href: '/produtos', label: 'Cardápio' },
   { href: '/pdv', label: 'PDV' },
   { href: '/vendas', label: 'Vendas' },
+  { href: '/despesas', label: 'Despesas' },
 ];
 
 export function Navbar() {
