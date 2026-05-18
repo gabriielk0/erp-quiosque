@@ -21,9 +21,7 @@ export default function ProdutosPage() {
     updateProduto,
     deleteProduto,
     custoProducao,
-    precoSugerido,
     precoFinal,
-    custoUnitario,
   } = useAppStore();
   const [form, setForm] = useState(emptyProduto());
   const [editing, setEditing] = useState<string | null>(null);
