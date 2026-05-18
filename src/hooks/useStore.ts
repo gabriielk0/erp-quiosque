@@ -309,9 +309,9 @@ export function useStore() {
           vendas: prev.vendas.filter((v) => v.id !== id),
         };
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao excluir venda:', error);
-      alert(`Erro ao excluir venda: ${error.message}`);
+      alert(`Erro ao excluir venda: ${error?.message || 'Erro desconhecido'}`);
     }
   }, []);
 
