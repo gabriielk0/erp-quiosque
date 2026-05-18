@@ -36,6 +36,16 @@ export default function InsumosPage() {
     setShowForm(true);
   };
 
+  const handleAjusteEstoque = (insumo: Insumo, tipo: 'entrada' | 'saida') => {
+    const qtdStr = window.prompt(`Quantos(as) ${insumo.unidadeMedida} de ${insumo.nome} darão ${tipo}?`);
+    if (!qtdStr) return;
+    const qtd = Number(qtdStr.replace(',', '.'));
+    if (isNaN(qtd) || qtd <= 0) return alert('Quantidade inválida!');
+
+    const novoEstoque = tipo === 'entrada' ? insumo.estoqueAtual + qtd : insumo.estoqueAtual - qtd;
+    updateInsumo(insumo.id, { ...insumo, estoqueAtual: novoEstoque });
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-6 animate-in">
       <div className="flex items-center justify-between">
@@ -119,6 +129,18 @@ export default function InsumosPage() {
                   <td className="px-4 py-3 font-mono text-blue-600 dark:text-blue-400">{fmt(custoUnitario(insumo))}</td>
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
+                      <button
+                        className="btn-ghost text-xs py-1 px-2 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                        onClick={() => handleAjusteEstoque(insumo, 'entrada')}
+                      >
+                        + Entrada
+                      </button>
+                      <button
+                        className="btn-ghost text-xs py-1 px-2 text-amber-600 hover:text-amber-700 dark:text-amber-400"
+                        onClick={() => handleAjusteEstoque(insumo, 'saida')}
+                      >
+                        - Saída
+                      </button>
                       <button className="btn-ghost text-xs py-1 px-2" onClick={() => startEdit(insumo)}>Editar</button>
                       <button className="btn-danger text-xs py-1 px-2" onClick={() => deleteInsumo(insumo.id)}>Del</button>
                     </div>

@@ -59,6 +59,11 @@ const mapProduto = (raw: any): Produto => ({
     raw.precoVenda !== null && raw.precoVenda !== undefined
       ? Number(raw.precoVenda)
       : undefined,
+  precoIfood:
+    raw.precoIfood !== null && raw.precoIfood !== undefined
+      ? Number(raw.precoIfood)
+      : undefined,
+  disponivelIfood: raw.disponivelIfood ?? true,
   ativo: Boolean(raw.ativo),
   insumos: Array.isArray(raw.insumos)
     ? raw.insumos.map((item: any) => ({
@@ -72,6 +77,7 @@ const mapProduto = (raw: any): Produto => ({
 const mapVenda = (raw: any): Venda => ({
   id: String(raw.id),
   total: Number(raw.total),
+  canal: raw.canal ?? 'salao',
   criadaEm: String(raw.criadaEm),
   itens: Array.isArray(raw.itens)
     ? raw.itens.map((item: any) => ({
@@ -97,6 +103,8 @@ const prepareProdutoBody = (produto: Omit<Produto, 'id' | 'criadoEm'>) => ({
   descricao: produto.descricao ?? null,
   margemSeguranca: produto.margemLucro,
   precoVenda: produto.precoVenda ?? null,
+  precoIfood: (produto as any).precoIfood ?? null,
+  disponivelIfood: (produto as any).disponivelIfood ?? true,
   ativo: produto.ativo,
   insumos: produto.insumos.map((item) => ({
     insumoId: Number(item.insumoId),
@@ -107,15 +115,29 @@ const prepareProdutoBody = (produto: Omit<Produto, 'id' | 'criadoEm'>) => ({
 export function useStore() {
   const [state, setState] = useState<AppState>(defaultState);
   const [hydrated, setHydrated] = useState(false);
+  const [config, setConfig] = useState({
+    margemLucroPadrao: 18.23,
+    markupPadrao: 2.8,
+    cmvMaximo: 37.5,
+  });
 
   useEffect(() => {
     async function load() {
       try {
-        const [insumos, produtos, vendas] = await Promise.all([
+        const [insumos, produtos, vendas, cfg] = await Promise.all([
           fetchJson('/api/insumos'),
           fetchJson('/api/produtos'),
           fetchJson('/api/vendas?limite=100'),
+          fetchJson('/api/configuracao').catch(() => null),
         ]);
+
+        if (cfg) {
+          setConfig({
+            margemLucroPadrao: Number(cfg.margemLucroPadrao) * 100,
+            markupPadrao: Number(cfg.markupPadrao),
+            cmvMaximo: Number(cfg.cmvMaximo) * 100,
+          });
+        }
 
         setState({
           insumos: Array.isArray(insumos) ? insumos.map(mapInsumo) : [],
@@ -217,6 +239,8 @@ export function useStore() {
           ...data,
           margemSeguranca: data.margemLucro,
           precoVenda: data.precoVenda ?? null,
+          precoIfood: (data as any).precoIfood ?? null,
+          disponivelIfood: (data as any).disponivelIfood ?? true,
           insumos: data.insumos?.map((item) => ({
             insumoId: Number(item.insumoId),
             qtdBruta: item.quantidade,
@@ -254,8 +278,42 @@ export function useStore() {
     }
   }, []);
 
+  const deleteVenda = useCallback(async (id: string) => {
+    try {
+      await fetchJson(`/api/vendas/${id}`, { method: 'DELETE' });
+
+      setState((prev) => {
+        const venda = prev.vendas.find((v) => v.id === id);
+        if (!venda) return prev;
+
+        // Estorna o estoque localmente
+        const insumos = prev.insumos.map((i) => {
+          let estoqueAtual = i.estoqueAtual;
+          for (const item of venda.itens) {
+            const produto = prev.produtos.find((p) => p.id === item.produtoId);
+            if (!produto) continue;
+            for (const pi of produto.insumos) {
+              if (pi.insumoId === i.id) {
+                estoqueAtual += pi.quantidade * item.quantidade;
+              }
+            }
+          }
+          return { ...i, estoqueAtual };
+        });
+
+        return {
+          ...prev,
+          insumos,
+          vendas: prev.vendas.filter((v) => v.id !== id),
+        };
+      });
+    } catch (error) {
+      console.error('Erro ao excluir venda:', error);
+    }
+  }, []);
+
   const addVenda = useCallback(
-    async (venda: Omit<Venda, 'id' | 'criadaEm'>) => {
+    async (venda: Omit<Venda, 'id' | 'criadaEm'> & { canal?: string }) => {
       try {
         const created = await fetchJson('/api/vendas', {
           method: 'POST',
@@ -265,7 +323,7 @@ export function useStore() {
               quantidade: item.quantidade,
               precoUnitario: item.precoUnitario,
             })),
-            canal: 'salao',
+            canal: venda.canal ?? 'salao',
           }),
         });
 
@@ -327,6 +385,7 @@ export function useStore() {
 
   return {
     state,
+    config,
     hydrated,
     addInsumo,
     updateInsumo,
@@ -335,6 +394,7 @@ export function useStore() {
     updateProduto,
     deleteProduto,
     addVenda,
+    deleteVenda,
     custoUnitario,
     custoProducao,
     precoSugerido,

@@ -8,6 +8,17 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ─── CONFIGURAÇÕES GLOBAIS ──────────────────────────────────────────────────
+model ConfiguracaoSistema {
+  id                Int      @id @default(autoincrement())
+  margemLucroPadrao Decimal  @db.Decimal(5, 4) @default(0.1823) // 18.23%
+  markupPadrao      Decimal  @db.Decimal(5, 2) @default(2.8)
+  cmvMaximo         Decimal  @db.Decimal(5, 4) @default(0.375)  // 37.5%
+  atualizadoEm      DateTime @updatedAt
+
+  @@map("configuracao_sistema")
+}
+
 // ─── INSUMOS (Base de Dados da planilha) ───────────────────────────────────
 model Insumo {
   id                  Int      @id @default(autoincrement())
@@ -49,7 +60,7 @@ model Produto {
   descricao           String?
   rendimentoPorcoes   Decimal  @db.Decimal(10, 3)   @default(1)  // qtd de porções que a receita rende
   obsPorcao           String?
-  margemSeguranca     Decimal  @db.Decimal(5, 2)    @default(10) // % (padrão 10%)
+  margemSeguranca     Decimal? @db.Decimal(5, 2)                 // % (se null, usa padrão)
   precoVenda          Decimal? @db.Decimal(10, 2)               // preço praticado (salão)
   precoIfood          Decimal? @db.Decimal(10, 2)               // preço praticado no iFood (pode diferir)
   disponivelIfood     Boolean  @default(true)                   // se aparece no PDV iFood
