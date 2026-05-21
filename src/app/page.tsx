@@ -35,25 +35,49 @@ export default function DashboardPage() {
       const dia = venda.criadaEm.slice(0, 10);
       if (!porDia[dia]) porDia[dia] = { dia, receita: 0, lucro: 0 };
 
+      let saleCusto = 0;
       for (const item of venda.itens) {
-        const produto = state.produtos.find((p) => p.id === item.produtoId);
-        if (!produto) continue;
-        const custo = custoProducao(produto) * item.quantidade;
-        const receita = item.precoUnitario * item.quantidade;
-        faturamento += receita;
-        custoTotal += custo;
-        porDia[dia].receita += receita;
-        porDia[dia].lucro += receita - custo;
+        let itemCusto = 0;
 
-        if (!porProduto[item.produtoId])
-          porProduto[item.produtoId] = {
-            nome: produto.nome,
+        // Priorizar snapshot de custo
+        if (item.custoUnitarioInsumos !== undefined && item.custoUnitarioInsumos !== null) {
+          itemCusto = Number(item.custoUnitarioInsumos) * item.quantidade;
+        } else if (item.produtoId) {
+          // Fallback para produtos antigos
+          const p = state.produtos.find((p) => p.id === item.produtoId);
+          itemCusto = p ? custoProducao(p) * item.quantidade : 0;
+        } else if (item.insumoId) {
+          // Fallback para insumos antigos
+          const insumo = state.insumos.find((i) => i.id === item.insumoId);
+          if (insumo && insumo.quantidadeEmbalagem > 0) {
+            const custoUnit = insumo.custoEmbalagem / insumo.quantidadeEmbalagem;
+            itemCusto = custoUnit * item.quantidade;
+          }
+        }
+        saleCusto += itemCusto;
+
+        // Registrar dados para o gráfico de produtos mais vendidos
+        const itemId = item.produtoId ?? (item.insumoId ? `insumo-${item.insumoId}` : `custom-${item.nomeCustom}`);
+        const itemName = item.produtoId 
+          ? (state.produtos.find((p) => p.id === item.produtoId)?.nome ?? 'Produto removido')
+          : (item.nomeCustom ?? 'Item Avulso');
+
+        if (!porProduto[itemId]) {
+          porProduto[itemId] = {
+            nome: itemName,
             qty: 0,
             receita: 0,
           };
-        porProduto[item.produtoId].qty += item.quantidade;
-        porProduto[item.produtoId].receita += receita;
+        }
+        porProduto[itemId].qty += item.quantidade;
+        porProduto[itemId].receita += item.precoUnitario * item.quantidade;
       }
+
+      faturamento += venda.total;
+      custoTotal += saleCusto;
+
+      porDia[dia].receita += venda.total;
+      porDia[dia].lucro += (venda.total - saleCusto);
     }
 
     const lucro = faturamento - custoTotal;
@@ -65,7 +89,7 @@ export default function DashboardPage() {
       .slice(-30);
 
     return { faturamento, custoTotal, lucro, top5, linhas };
-  }, [state.vendas, state.produtos, custoProducao]);
+  }, [state.vendas, state.produtos, state.insumos, custoProducao]);
 
   const fmt = (n: number) =>
     n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -161,7 +185,7 @@ export default function DashboardPage() {
         {/* Top 5 */}
         <div className="card p-5">
           <h2 className="text-sm font-semibold text-stone-700 dark:text-stone-300 mb-4">
-            Top 5 Produtos
+            Top 5 Itens Vendidos
           </h2>
           {stats.top5.length === 0 ? (
             <EmptyChart />

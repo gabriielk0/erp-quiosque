@@ -5,7 +5,7 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 // ─── CONFIGURAÇÕES GLOBAIS ──────────────────────────────────────────────────
@@ -34,6 +34,7 @@ model Insumo {
 
   // custo por unidade = rsPago / volumeEmbalagem (calculado na app)
   produtoInsumos      ProdutoInsumo[]
+  itensVenda          ItemVenda[]
 
   @@map("insumos")
 }
@@ -93,11 +94,15 @@ model ProdutoInsumo {
 
 // ─── VENDAS ──────────────────────────────────────────────────────────────────
 model Venda {
-  id           Int        @id @default(autoincrement())
-  canal        String     @default("salao")   // "salao" | "ifood" | "balcao"
-  total        Decimal    @db.Decimal(10, 2)
-  criadaEm     DateTime   @default(now())
-  atualizadoEm DateTime   @updatedAt
+  id            Int      @id @default(autoincrement())
+  canal         String   @default("salao") // "salao" | "ifood" | "balcao"
+  subtotal      Decimal  @db.Decimal(10, 2) @default(0)
+  desconto      Decimal  @db.Decimal(10, 2) @default(0)
+  taxaAdicional Decimal  @db.Decimal(10, 2) @default(0)
+  total         Decimal  @db.Decimal(10, 2)
+  observacoes   String?  @db.Text
+  criadaEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
 
   itens ItemVenda[]
 
@@ -105,14 +110,18 @@ model Venda {
 }
 
 model ItemVenda {
-  id             Int     @id @default(autoincrement())
-  vendaId        Int
-  produtoId      Int
-  quantidade     Int
-  precoUnitario  Decimal @db.Decimal(10, 2)
+  id                   Int      @id @default(autoincrement())
+  vendaId              Int
+  produtoId            Int?
+  insumoId             Int?
+  nomeCustom           String?
+  quantidade           Int
+  precoUnitario        Decimal  @db.Decimal(10, 2)
+  custoUnitarioInsumos Decimal  @db.Decimal(10, 4) @default(0)
 
-  venda   Venda   @relation(fields: [vendaId], references: [id], onDelete: Cascade)
-  produto Produto @relation(fields: [produtoId], references: [id])
+  venda   Venda    @relation(fields: [vendaId], references: [id], onDelete: Cascade)
+  produto Produto? @relation(fields: [produtoId], references: [id])
+  insumo  Insumo?  @relation(fields: [insumoId], references: [id])
 
   @@map("itens_venda")
 }
@@ -127,4 +136,53 @@ model FaturamentoMensal {
 
   @@unique([ano, mes])
   @@map("faturamento_mensal")
+}
+
+// ─── GESTÃO FINANCEIRA DINÂMICA ─────────────────────────────────────────────
+
+enum CategoryType {
+  FIXED     // Custo Fixo (Absoluto em R$)
+  VARIABLE  // Custo Variável (Alíquota em %)
+}
+
+model ExpenseCategory {
+  id           Int             @id @default(autoincrement())
+  nome         String          @unique
+  tipo         CategoryType
+  ativo        Boolean         @default(true)
+  criadoEm     DateTime        @default(now())
+  atualizadoEm DateTime        @updatedAt
+
+  records      FinancialRecord[]
+
+  @@map("expense_categories")
+}
+
+model FinancialRecord {
+  id           Int             @id @default(autoincrement())
+  descricao    String
+  valor        Decimal         @db.Decimal(12, 4) // R$ se tipo FIXED, alíquota (%) se tipo VARIABLE
+  ano          Int
+  mes          Int             // 1-12
+  categoriaId  Int
+  criadoEm     DateTime        @default(now())
+  atualizadoEm DateTime        @updatedAt
+
+  categoria    ExpenseCategory @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+
+  @@map("financial_records")
+}
+
+model MonthlyRevenue {
+  id           Int             @id @default(autoincrement())
+  ano          Int
+  mes          Int             // 1-12
+  faturamento  Decimal         @db.Decimal(12, 2)
+  cmvMeta      Decimal         @db.Decimal(5, 4) @default(0.3500)  // 35%
+  lucroMeta    Decimal         @db.Decimal(5, 4) @default(0.2000)  // 20%
+  criadoEm     DateTime        @default(now())
+  atualizadoEm DateTime        @updatedAt
+
+  @@unique([ano, mes])
+  @@map("monthly_revenues")
 }

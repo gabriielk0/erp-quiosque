@@ -11,6 +11,19 @@ export default function PDVPage() {
   const [busca, setBusca] = useState('');
   const [categoriaFilter, setCategoriaFilter] = useState<string | null>(null);
 
+  // Novos estados para taxas, descontos e observações
+  const [desconto, setDesconto] = useState<number>(0);
+  const [taxaAdicional, setTaxaAdicional] = useState<number>(0);
+  const [observacoes, setObservacoes] = useState<string>('');
+
+  // Estados para o formulário de item avulso / insumo direto
+  const [showAvulsoForm, setShowAvulsoForm] = useState(false);
+  const [avulsoTipo, setAvulsoTipo] = useState<'custom' | 'insumo'>('custom');
+  const [avulsoNome, setAvulsoNome] = useState('');
+  const [avulsoInsumoId, setAvulsoInsumoId] = useState('');
+  const [avulsoPreco, setAvulsoPreco] = useState<number | ''>('');
+  const [avulsoQtd, setAvulsoQtd] = useState<number>(1);
+
   const fmt = (n: number) =>
     n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -47,40 +60,111 @@ export default function PDVPage() {
     if (canal !== novoCanal) {
       setCanal(novoCanal);
       setCarrinho([]);
+      setDesconto(0);
+      setTaxaAdicional(0);
+      setObservacoes('');
     }
+  };
+
+  const addItemToCart = (itemToAdd: Omit<ItemVenda, 'quantidade'> & { quantidade?: number }) => {
+    setCarrinho((c) => {
+      const idx = c.findIndex((i) => {
+        if (itemToAdd.produtoId && i.produtoId === itemToAdd.produtoId) return true;
+        if (itemToAdd.insumoId && i.insumoId === itemToAdd.insumoId) return true;
+        if (itemToAdd.nomeCustom && !itemToAdd.insumoId && i.nomeCustom === itemToAdd.nomeCustom && !i.insumoId) return true;
+        return false;
+      });
+      const qtyToAdd = itemToAdd.quantidade ?? 1;
+      if (idx >= 0) {
+        return c.map((i, j) =>
+          j === idx ? { ...i, quantidade: i.quantidade + qtyToAdd } : i,
+        );
+      }
+      return [...c, { ...itemToAdd, quantidade: qtyToAdd } as ItemVenda];
+    });
   };
 
   const addItem = (produtoId: string) => {
     const produto = state.produtos.find((p) => p.id === produtoId)!;
     const preco = getPreco(produto);
-    setCarrinho((c) => {
-      const idx = c.findIndex((i) => i.produtoId === produtoId);
-      if (idx >= 0)
-        return c.map((i, j) =>
-          j === idx ? { ...i, quantidade: i.quantidade + 1 } : i,
-        );
-      return [...c, { produtoId, quantidade: 1, precoUnitario: preco }];
-    });
+    addItemToCart({ produtoId, precoUnitario: preco });
   };
 
-  const removeItem = (produtoId: string) =>
-    setCarrinho((c) => c.filter((i) => i.produtoId !== produtoId));
-  const changeQty = (produtoId: string, qty: number) => {
-    if (qty <= 0) return removeItem(produtoId);
+  const removeItem = (itemToRemove: ItemVenda) => {
     setCarrinho((c) =>
-      c.map((i) => (i.produtoId === produtoId ? { ...i, quantidade: qty } : i)),
+      c.filter(
+        (i) =>
+          !(
+            (itemToRemove.produtoId && i.produtoId === itemToRemove.produtoId) ||
+            (itemToRemove.insumoId && i.insumoId === itemToRemove.insumoId) ||
+            (itemToRemove.nomeCustom && !itemToRemove.insumoId && i.nomeCustom === itemToRemove.nomeCustom && !i.insumoId)
+          ),
+      ),
     );
   };
 
-  const total = carrinho.reduce(
+  const changeQty = (itemToUpdate: ItemVenda, qty: number) => {
+    if (qty <= 0) return removeItem(itemToUpdate);
+    setCarrinho((c) =>
+      c.map((i) => {
+        const isMatch =
+          (itemToUpdate.produtoId && i.produtoId === itemToUpdate.produtoId) ||
+          (itemToUpdate.insumoId && i.insumoId === itemToUpdate.insumoId) ||
+          (itemToUpdate.nomeCustom && !itemToUpdate.insumoId && i.nomeCustom === itemToUpdate.nomeCustom && !i.insumoId);
+        return isMatch ? { ...i, quantidade: qty } : i;
+      }),
+    );
+  };
+
+  const handleAddAvulso = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (avulsoTipo === 'custom') {
+      if (!avulsoNome.trim() || avulsoPreco === '') return;
+      addItemToCart({
+        nomeCustom: avulsoNome.trim(),
+        precoUnitario: Number(avulsoPreco),
+        quantidade: avulsoQtd,
+      });
+    } else {
+      if (!avulsoInsumoId || avulsoPreco === '') return;
+      const insumo = state.insumos.find((i) => i.id === avulsoInsumoId);
+      if (!insumo) return;
+      addItemToCart({
+        insumoId: avulsoInsumoId,
+        nomeCustom: insumo.nome,
+        precoUnitario: Number(avulsoPreco),
+        quantidade: avulsoQtd,
+      });
+    }
+    // Limpar form
+    setAvulsoNome('');
+    setAvulsoInsumoId('');
+    setAvulsoPreco('');
+    setAvulsoQtd(1);
+    setShowAvulsoForm(false);
+  };
+
+  const subtotal = carrinho.reduce(
     (acc, i) => acc + i.precoUnitario * i.quantidade,
     0,
   );
+  const total = Math.max(0, subtotal - desconto + taxaAdicional);
 
   const finalizarVenda = () => {
     if (carrinho.length === 0) return;
-    addVenda({ itens: carrinho, total, canal });
+    addVenda({
+      itens: carrinho,
+      subtotal,
+      desconto,
+      taxaAdicional,
+      total,
+      observacoes,
+      canal,
+    });
     setCarrinho([]);
+    setDesconto(0);
+    setTaxaAdicional(0);
+    setObservacoes('');
     setSuccess(true);
     setTimeout(() => setSuccess(false), 3000);
   };
@@ -190,60 +274,257 @@ export default function PDVPage() {
             Carrinho
           </h2>
           <div className="card p-4 space-y-3">
+            {/* Header / Botão de item avulso */}
+            <div className="flex justify-between items-center pb-2 border-b border-stone-100 dark:border-neutral-800">
+              <span className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider">Itens</span>
+              <button
+                onClick={() => setShowAvulsoForm(!showAvulsoForm)}
+                className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1 transition-colors"
+              >
+                {showAvulsoForm ? 'Cancelar' : '+ Adicionar Avulso / Insumo'}
+              </button>
+            </div>
+
+            {/* Form de item avulso */}
+            {showAvulsoForm && (
+              <form onSubmit={handleAddAvulso} className="bg-stone-50 dark:bg-neutral-800/50 p-3 rounded-xl border border-stone-100 dark:border-neutral-800 space-y-2 animate-in">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setAvulsoTipo('custom'); setAvulsoNome(''); }}
+                    className={`flex-1 py-1 px-2 text-xs font-medium rounded-md transition-colors ${avulsoTipo === 'custom' ? 'bg-blue-600 text-white' : 'bg-stone-200 dark:bg-neutral-800 text-stone-600 dark:text-stone-400 hover:bg-stone-300'}`}
+                  >
+                    Avulso
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setAvulsoTipo('insumo'); setAvulsoInsumoId(''); }}
+                    className={`flex-1 py-1 px-2 text-xs font-medium rounded-md transition-colors ${avulsoTipo === 'insumo' ? 'bg-blue-600 text-white' : 'bg-stone-200 dark:bg-neutral-800 text-stone-600 dark:text-stone-400 hover:bg-stone-300'}`}
+                  >
+                    Insumo
+                  </button>
+                </div>
+
+                {avulsoTipo === 'custom' ? (
+                  <div>
+                    <label className="label">Nome do Item</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Embalagem extra, taxa..."
+                      value={avulsoNome}
+                      onChange={(e) => setAvulsoNome(e.target.value)}
+                      className="input py-1.5 text-xs"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="label">Insumo</label>
+                    <select
+                      required
+                      value={avulsoInsumoId}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setAvulsoInsumoId(val);
+                        const ins = state.insumos.find(i => i.id === val);
+                        if (ins) {
+                          setAvulsoNome(ins.nome);
+                          const unitCost = ins.quantidadeEmbalagem > 0 
+                            ? Number((ins.custoEmbalagem / ins.quantidadeEmbalagem).toFixed(2)) 
+                            : 0;
+                          setAvulsoPreco(unitCost);
+                        }
+                      }}
+                      className="input py-1.5 text-xs"
+                    >
+                      <option value="">Selecione um insumo...</option>
+                      {[...state.insumos]
+                        .sort((a, b) => a.nome.localeCompare(b.nome))
+                        .map((ins) => (
+                          <option key={ins.id} value={ins.id}>
+                            {ins.nome} - Est. {ins.estoqueAtual} {ins.unidadeMedida}
+                          </option>
+                        ))}
+                    </select>
+                    {avulsoInsumoId && (
+                      <span className="text-[10px] text-stone-500 mt-0.5 block">
+                        Custo unitário: {fmt(
+                          (state.insumos.find(i => i.id === avulsoInsumoId)?.custoEmbalagem ?? 0) /
+                          (state.insumos.find(i => i.id === avulsoInsumoId)?.quantidadeEmbalagem || 1)
+                        )}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="label">Preço Venda (R$)</label>
+                    <input
+                      type="number"
+                      required
+                      step="0.01"
+                      min="0"
+                      placeholder="0,00"
+                      value={avulsoPreco}
+                      onChange={(e) => setAvulsoPreco(e.target.value !== '' ? Number(e.target.value) : '')}
+                      className="input py-1.5 text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Quantidade</label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      value={avulsoQtd}
+                      onChange={(e) => setAvulsoQtd(Number(e.target.value))}
+                      className="input py-1.5 text-xs font-mono"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full btn-primary py-1.5 text-xs mt-1"
+                >
+                  Adicionar ao Carrinho
+                </button>
+              </form>
+            )}
+
             {carrinho.length === 0 ? (
               <p className="text-stone-400 text-sm text-center py-8">
-                Selecione itens ao lado
+                Selecione itens ao lado ou adicione um avulso
               </p>
             ) : (
               <>
-                {carrinho.map((item) => {
-                  const p = state.produtos.find((p) => p.id === item.produtoId);
-                  return (
-                    <div
-                      key={item.produtoId}
-                      className="flex items-center gap-2 text-sm"
-                    >
-                      <button
-                        onClick={() => removeItem(item.produtoId)}
-                        className="text-red-400 hover:text-red-600 shrink-0"
+                <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                  {carrinho.map((item, idx) => {
+                    const p = state.produtos.find((p) => p.id === item.produtoId);
+                    const nome = p?.nome ?? item.nomeCustom ?? 'Item Avulso';
+                    const keyStr = item.produtoId ? `p-${item.produtoId}` : (item.insumoId ? `i-${item.insumoId}` : `c-${item.nomeCustom}-${idx}`);
+
+                    return (
+                      <div
+                        key={keyStr}
+                        className="flex items-center gap-2 text-sm"
                       >
-                        ✕
-                      </button>
-                      <span className="flex-1 font-medium truncate">
-                        {p?.nome}
-                      </span>
-                      <div className="flex items-center gap-1 shrink-0">
                         <button
-                          onClick={() =>
-                            changeQty(item.produtoId, item.quantidade - 1)
-                          }
-                          className="w-6 h-6 rounded-lg bg-stone-100 dark:bg-neutral-800 flex items-center justify-center hover:bg-stone-200"
+                          onClick={() => removeItem(item)}
+                          className="text-red-400 hover:text-red-600 shrink-0 transition-colors"
                         >
-                          −
+                          ✕
                         </button>
-                        <span className="w-6 text-center font-mono">
-                          {item.quantidade}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
+                            {nome}
+                            {item.insumoId && (
+                              <span className="badge bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-900 text-[10px] py-0 px-1.5 font-normal font-sans">
+                                Insumo
+                              </span>
+                            )}
+                            {!item.produtoId && !item.insumoId && (
+                              <span className="badge bg-stone-100 dark:bg-neutral-800 text-stone-600 dark:text-stone-400 border border-stone-200 dark:border-neutral-700 text-[10px] py-0 px-1.5 font-normal font-sans">
+                                Avulso
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() =>
+                              changeQty(item, item.quantidade - 1)
+                            }
+                            className="w-6 h-6 rounded-lg bg-stone-100 dark:bg-neutral-800 flex items-center justify-center hover:bg-stone-200 dark:hover:bg-neutral-700 transition-colors text-stone-600 dark:text-stone-400"
+                          >
+                            −
+                          </button>
+                          <span className="w-6 text-center font-mono font-medium text-stone-800 dark:text-stone-200">
+                            {item.quantidade}
+                          </span>
+                          <button
+                            onClick={() =>
+                              changeQty(item, item.quantidade + 1)
+                            }
+                            className="w-6 h-6 rounded-lg bg-stone-100 dark:bg-neutral-800 flex items-center justify-center hover:bg-stone-200 dark:hover:bg-neutral-700 transition-colors text-stone-600 dark:text-stone-400"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <span className="font-mono text-stone-700 dark:text-stone-300 shrink-0 w-20 text-right">
+                          {fmt(item.precoUnitario * item.quantidade)}
                         </span>
-                        <button
-                          onClick={() =>
-                            changeQty(item.produtoId, item.quantidade + 1)
-                          }
-                          className="w-6 h-6 rounded-lg bg-stone-100 dark:bg-neutral-800 flex items-center justify-center hover:bg-stone-200"
-                        >
-                          +
-                        </button>
                       </div>
-                      <span className="font-mono text-stone-700 dark:text-stone-300 shrink-0 w-20 text-right">
-                        {fmt(item.precoUnitario * item.quantidade)}
+                    );
+                  })}
+                </div>
+
+                {/* Subtotal, Descontos, Taxas e Observações */}
+                <div className="border-t border-stone-200 dark:border-neutral-700 pt-3 mt-3 space-y-3">
+                  {/* Inputs rápidos */}
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div>
+                      <label className="label">Desconto (R$)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0,00"
+                        value={desconto || ''}
+                        onChange={(e) => setDesconto(Math.max(0, Number(e.target.value)))}
+                        className="input py-1.5 text-xs font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Taxa Extra / Entrega</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0,00"
+                        value={taxaAdicional || ''}
+                        onChange={(e) => setTaxaAdicional(Math.max(0, Number(e.target.value)))}
+                        className="input py-1.5 text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="label">Observações da Venda</label>
+                    <textarea
+                      placeholder="Ex: Entregar na mesa 5, sem cebola, etc."
+                      value={observacoes}
+                      onChange={(e) => setObservacoes(e.target.value)}
+                      className="input py-1.5 text-xs h-12 resize-none"
+                    />
+                  </div>
+
+                  {/* Resumo financeiro */}
+                  <div className="space-y-1.5 pt-2 border-t border-stone-100 dark:border-neutral-800 text-xs">
+                    <div className="flex justify-between text-stone-500 dark:text-stone-400">
+                      <span>Subtotal</span>
+                      <span className="font-mono">{fmt(subtotal)}</span>
+                    </div>
+                    {desconto > 0 && (
+                      <div className="flex justify-between text-red-600 dark:text-red-400">
+                        <span>Desconto</span>
+                        <span className="font-mono">-{fmt(desconto)}</span>
+                      </div>
+                    )}
+                    {taxaAdicional > 0 && (
+                      <div className="flex justify-between text-stone-600 dark:text-stone-300 font-medium">
+                        <span>Taxa Adicional</span>
+                        <span className="font-mono">+{fmt(taxaAdicional)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center text-sm font-semibold pt-1 border-t border-stone-100 dark:border-neutral-800/80">
+                      <span className="text-stone-900 dark:text-stone-100 text-sm">Total</span>
+                      <span className="font-mono font-bold text-base text-emerald-600 dark:text-emerald-400">
+                        {fmt(total)}
                       </span>
                     </div>
-                  );
-                })}
-                <div className="border-t border-stone-200 dark:border-neutral-700 pt-3 mt-3 flex justify-between items-center">
-                  <span className="font-semibold">Total</span>
-                  <span className="font-mono font-bold text-lg text-emerald-600">
-                    {fmt(total)}
-                  </span>
+                  </div>
                 </div>
               </>
             )}
@@ -257,7 +538,12 @@ export default function PDVPage() {
           </button>
           {carrinho.length > 0 && (
             <button
-              onClick={() => setCarrinho([])}
+              onClick={() => {
+                setCarrinho([]);
+                setDesconto(0);
+                setTaxaAdicional(0);
+                setObservacoes('');
+              }}
               className="w-full btn-ghost text-sm"
             >
               Limpar Carrinho

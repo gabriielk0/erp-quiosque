@@ -37,16 +37,32 @@ export default function VendasPage() {
         ) : (
           vendasOrdenadas.map((venda) => {
             const custo = venda.itens.reduce((acc, item) => {
-              const p = state.produtos.find((p) => p.id === item.produtoId);
-              return acc + (p ? custoProducao(p) * item.quantidade : 0);
+              // Priorizar o snapshot do custo unitário
+              if (item.custoUnitarioInsumos !== undefined && item.custoUnitarioInsumos !== null) {
+                return acc + (Number(item.custoUnitarioInsumos) * item.quantidade);
+              }
+              // Fallback para vendas antigas
+              if (item.produtoId) {
+                const p = state.produtos.find((p) => p.id === item.produtoId);
+                return acc + (p ? custoProducao(p) * item.quantidade : 0);
+              } else if (item.insumoId) {
+                const insumo = state.insumos.find((i) => i.id === item.insumoId);
+                if (insumo && insumo.quantidadeEmbalagem > 0) {
+                  const custoUnit = insumo.custoEmbalagem / insumo.quantidadeEmbalagem;
+                  return acc + (custoUnit * item.quantidade);
+                }
+              }
+              return acc;
             }, 0);
+
             const lucro = venda.total - custo;
+
             return (
               <div key={venda.id} className="card p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <p className="font-mono text-xs text-stone-400">
-                      #{venda.id.slice(0, 8)}
+                      #{venda.id}
                     </p>
                     <p className="text-sm text-stone-500">
                       {new Date(venda.criadaEm).toLocaleString('pt-BR')}
@@ -84,22 +100,57 @@ export default function VendasPage() {
                     </button>
                   </div>
                 </div>
+
+                {/* Itens da Venda */}
                 <div className="flex flex-wrap gap-2">
-                  {venda.itens.map((item) => {
+                  {venda.itens.map((item, idx) => {
                     const p = state.produtos.find(
                       (p) => p.id === item.produtoId,
                     );
+                    const nome = p?.nome ?? item.nomeCustom ?? 'Item Avulso';
+                    const keyStr = item.produtoId ? `p-${item.produtoId}` : (item.insumoId ? `i-${item.insumoId}` : `c-${item.nomeCustom}-${idx}`);
+
                     return (
                       <span
-                        key={item.produtoId}
-                        className="badge bg-stone-100 dark:bg-neutral-800 text-stone-600 dark:text-stone-400"
+                        key={keyStr}
+                        className="badge bg-stone-100 dark:bg-neutral-800 text-stone-600 dark:text-stone-400 border border-stone-200/50 dark:border-neutral-700/50 flex items-center gap-1.5"
                       >
-                        {item.quantidade}× {p?.nome ?? 'Produto removido'} —{' '}
-                        {fmt(item.precoUnitario * item.quantidade)}
+                        <span className="font-semibold text-stone-800 dark:text-stone-200">{item.quantidade}×</span>
+                        <span className="truncate max-w-[150px]">{nome}</span>
+                        {item.insumoId && (
+                          <span className="text-[9px] bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 px-1 rounded-sm">Insumo</span>
+                        )}
+                        {!item.produtoId && !item.insumoId && (
+                          <span className="text-[9px] bg-stone-200 dark:bg-neutral-700 text-stone-700 dark:text-stone-300 px-1 rounded-sm">Avulso</span>
+                        )}
+                        <span>—</span>
+                        <span className="font-mono text-stone-500">{fmt(item.precoUnitario * item.quantidade)}</span>
                       </span>
                     );
                   })}
                 </div>
+
+                {/* Subtotal, Desconto, Taxa e Observações */}
+                {(venda.desconto > 0 || venda.taxaAdicional > 0 || venda.observacoes) && (
+                  <div className="mt-3 pt-3 border-t border-stone-100 dark:border-neutral-800 flex flex-wrap items-center justify-between gap-3 text-xs text-stone-500">
+                    <div className="flex gap-4">
+                      {venda.subtotal > 0 && (
+                        <span>Subtotal: <strong className="text-stone-700 dark:text-stone-300">{fmt(venda.subtotal)}</strong></span>
+                      )}
+                      {venda.desconto > 0 && (
+                        <span className="text-red-500 font-medium">Desconto: -{fmt(venda.desconto)}</span>
+                      )}
+                      {venda.taxaAdicional > 0 && (
+                        <span className="text-stone-700 dark:text-stone-300 font-medium">Taxa: +{fmt(venda.taxaAdicional)}</span>
+                      )}
+                    </div>
+                    {venda.observacoes && (
+                      <span className="italic bg-stone-50 dark:bg-neutral-800/80 px-2 py-1 rounded-md max-w-md truncate text-stone-600 dark:text-stone-400" title={venda.observacoes}>
+                        Obs: {venda.observacoes}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })

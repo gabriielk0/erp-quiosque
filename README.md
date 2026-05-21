@@ -13,7 +13,7 @@ ERP completo para quiosque de alimentação e bebidas.
 ## Configuração do Neon / Prisma
 
 1. Copie `.env.example` para `.env.local`.
-2. Preencha `DATABASE_URL` e `DIRECT_URL` com as URLs do Neon.
+2. Preencha `DATABASE_URL` e `DATABASE_URL_UNPOOLED` com as URLs do Neon.
 3. Rode:
    ```bash
    npm run db:push

@@ -78,14 +78,21 @@ const mapProduto = (raw: any): Produto =>
 const mapVenda = (raw: any): Venda =>
   ({
     id: String(raw.id),
+    subtotal: Number(raw.subtotal ?? 0),
+    desconto: Number(raw.desconto ?? 0),
+    taxaAdicional: Number(raw.taxaAdicional ?? 0),
     total: Number(raw.total),
+    observacoes: raw.observacoes ?? undefined,
     canal: raw.canal ?? 'salao',
     criadaEm: String(raw.criadaEm),
     itens: Array.isArray(raw.itens)
       ? raw.itens.map((item: any) => ({
-          produtoId: String(item.produtoId),
+          produtoId: item.produtoId ? String(item.produtoId) : undefined,
+          insumoId: item.insumoId ? String(item.insumoId) : undefined,
+          nomeCustom: item.nomeCustom ?? undefined,
           quantidade: Number(item.quantidade),
           precoUnitario: Number(item.precoUnitario),
+          custoUnitarioInsumos: item.custoUnitarioInsumos !== null && item.custoUnitarioInsumos !== undefined ? Number(item.custoUnitarioInsumos) : undefined,
         }))
       : [],
   }) as any;
@@ -292,12 +299,16 @@ export function useStore() {
         const insumos = prev.insumos.map((i) => {
           let estoqueAtual = i.estoqueAtual;
           for (const item of venda.itens) {
-            const produto = prev.produtos.find((p) => p.id === item.produtoId);
-            if (!produto) continue;
-            for (const pi of produto.insumos) {
-              if (pi.insumoId === i.id) {
-                estoqueAtual += pi.quantidade * item.quantidade;
+            if (item.produtoId) {
+              const produto = prev.produtos.find((p) => p.id === item.produtoId);
+              if (!produto) continue;
+              for (const pi of produto.insumos) {
+                if (pi.insumoId === i.id) {
+                  estoqueAtual += pi.quantidade * item.quantidade;
+                }
               }
+            } else if (item.insumoId === i.id) {
+              estoqueAtual += item.quantidade;
             }
           }
           return { ...i, estoqueAtual };
@@ -322,11 +333,16 @@ export function useStore() {
           method: 'POST',
           body: JSON.stringify({
             itens: venda.itens.map((item) => ({
-              produtoId: Number(item.produtoId),
+              produtoId: item.produtoId ? Number(item.produtoId) : null,
+              insumoId: item.insumoId ? Number(item.insumoId) : null,
+              nomeCustom: item.nomeCustom ?? null,
               quantidade: item.quantidade,
               precoUnitario: item.precoUnitario,
             })),
             canal: venda.canal ?? 'salao',
+            desconto: venda.desconto ?? 0,
+            taxaAdicional: venda.taxaAdicional ?? 0,
+            observacoes: venda.observacoes ?? '',
           }),
         });
 
@@ -336,14 +352,18 @@ export function useStore() {
           const insumos = prev.insumos.map((i) => {
             let estoqueAtual = i.estoqueAtual;
             for (const item of venda.itens) {
-              const produto = prev.produtos.find(
-                (p) => p.id === item.produtoId,
-              );
-              if (!produto) continue;
-              for (const pi of produto.insumos) {
-                if (pi.insumoId === i.id) {
-                  estoqueAtual -= pi.quantidade * item.quantidade;
+              if (item.produtoId) {
+                const produto = prev.produtos.find(
+                  (p) => p.id === item.produtoId,
+                );
+                if (!produto) continue;
+                for (const pi of produto.insumos) {
+                  if (pi.insumoId === i.id) {
+                    estoqueAtual -= pi.quantidade * item.quantidade;
+                  }
                 }
+              } else if (item.insumoId === i.id) {
+                estoqueAtual -= item.quantidade;
               }
             }
             return { ...i, estoqueAtual };

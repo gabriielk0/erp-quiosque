@@ -10,6 +10,7 @@ export async function GET() {
             produto: {
               include: { insumos: { include: { insumo: true } } },
             },
+            insumo: true,
           },
         },
       },
@@ -31,7 +32,7 @@ export async function GET() {
   let custoTotal = 0;
   const vendasPorDia: Record<string, { receita: number; custo: number }> = {};
   const porProduto: Record<
-    number,
+    string,
     { nome: string; qty: number; receita: number }
   > = {};
 
@@ -39,32 +40,53 @@ export async function GET() {
     const dia = venda.criadaEm.toISOString().slice(0, 10);
     if (!vendasPorDia[dia]) vendasPorDia[dia] = { receita: 0, custo: 0 };
 
+    let vendaCustoTotal = 0;
     for (const item of venda.itens) {
       const receita = Number(item.precoUnitario) * item.quantidade;
-      vendasPorDia[dia].receita += receita;
 
       // Custo dos insumos
-      let custoProduto = 0;
-      for (const pi of item.produto.insumos) {
-        const cuUnit =
-          Number(pi.insumo.rsPago) / Number(pi.insumo.volumeEmbalagem);
-        custoProduto += cuUnit * Number(pi.qtdBruta);
+      let custoUnit = 0;
+      if (item.custoUnitarioInsumos !== null && item.custoUnitarioInsumos !== undefined) {
+        custoUnit = Number(item.custoUnitarioInsumos);
+      } else if (item.produtoId && item.produto) {
+        // Fallback para receitas antigas
+        for (const pi of item.produto.insumos) {
+          const cuUnitInsumo =
+            Number(pi.insumo.rsPago) / Number(pi.insumo.volumeEmbalagem);
+          custoUnit += cuUnitInsumo * Number(pi.qtdBruta);
+        }
+      } else if (item.insumoId && item.insumo) {
+        // Fallback para insumos antigos
+        const vol = Number(item.insumo.volumeEmbalagem);
+        custoUnit = vol > 0 ? Number(item.insumo.rsPago) / vol : 0;
       }
-      const custoVenda = custoProduto * item.quantidade;
-      custoTotal += custoVenda;
-      vendasPorDia[dia].custo += custoVenda;
+
+      const custoVenda = custoUnit * item.quantidade;
+      vendaCustoTotal += custoVenda;
 
       // Acumula por produto
-      if (!porProduto[item.produtoId]) {
-        porProduto[item.produtoId] = {
-          nome: item.produto.nome,
+      const itemId = item.produtoId 
+        ? String(item.produtoId) 
+        : (item.insumoId ? `insumo-${item.insumoId}` : `custom-${item.nomeCustom}`);
+      const itemName = item.produtoId && item.produto
+        ? item.produto.nome
+        : (item.nomeCustom ?? 'Item Avulso');
+
+      if (!porProduto[itemId]) {
+        porProduto[itemId] = {
+          nome: itemName,
           qty: 0,
           receita: 0,
         };
       }
-      porProduto[item.produtoId].qty += item.quantidade;
-      porProduto[item.produtoId].receita += receita;
+      porProduto[itemId].qty += item.quantidade;
+      porProduto[itemId].receita += receita;
     }
+
+    custoTotal += vendaCustoTotal;
+    // Usar venda.total para a receita daquele dia para considerar descontos e taxas adicionais
+    vendasPorDia[dia].receita += Number(venda.total);
+    vendasPorDia[dia].custo += vendaCustoTotal;
   }
 
   // Despesas fixas e variáveis totais

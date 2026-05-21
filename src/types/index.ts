@@ -28,15 +28,24 @@ export interface Produto {
 }
 
 export interface ItemVenda {
-  produtoId: string;
+  id?: string;
+  produtoId?: string; // Opcional para itens avulsos / insumos diretos
+  insumoId?: string; // Opcional para venda direta de insumo
+  nomeCustom?: string; // Nome personalizado para item avulso ou insumo direto
   quantidade: number;
   precoUnitario: number;
+  custoUnitarioInsumos?: number; // Custo de insumos snapshot no momento da venda
 }
 
 export interface Venda {
   id: string;
   itens: ItemVenda[];
+  subtotal: number;
+  desconto: number;
+  taxaAdicional: number;
   total: number;
+  observacoes?: string;
+  canal?: string;
   criadaEm: string;
 }
 
