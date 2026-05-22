@@ -108,8 +108,8 @@ export default function ProdutosPage() {
       ...f,
       insumos: f.insumos.find((i) => i.insumoId === insumoId)
         ? f.insumos.map((i) =>
-            i.insumoId === insumoId ? { ...i, quantidade: insumoQty } : i,
-          )
+          i.insumoId === insumoId ? { ...i, quantidade: insumoQty } : i,
+        )
         : [...f.insumos, { insumoId, quantidade: insumoQty }],
     }));
     setInsumoId('');
@@ -249,21 +249,19 @@ export default function ProdutosPage() {
         {/* Tabs */}
         <div className="flex border-b border-stone-200 dark:border-neutral-800">
           <button
-            className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
-              activeTab === 'geral'
+            className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${activeTab === 'geral'
                 ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
                 : 'border-transparent text-stone-500 hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200'
-            }`}
+              }`}
             onClick={() => setActiveTab('geral')}
           >
             Cardápio Geral
           </button>
           <button
-            className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
-              activeTab === 'ifood'
+            className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${activeTab === 'ifood'
                 ? 'border-orange-500 text-orange-500 dark:border-orange-500'
                 : 'border-transparent text-stone-500 hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200'
-            }`}
+              }`}
             onClick={() => setActiveTab('ifood')}
           >
             🌐 Canal iFood
@@ -284,7 +282,7 @@ export default function ProdutosPage() {
                 Configurações Ativas
               </span>
             </div>
-            
+
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-1.5">
@@ -373,14 +371,14 @@ export default function ProdutosPage() {
               state.produtos.map((p) => {
                 const custo = custoProducao(p);
                 const pesoTotal = calcPesoTotal(p);
-                
+
                 const impostoItem = p.ifoodTax !== undefined && p.ifoodTax !== null ? p.ifoodTax : ifoodConfig.imposto;
                 const comissaoAppItem = p.ifoodAppCommission !== undefined && p.ifoodAppCommission !== null ? p.ifoodAppCommission : ifoodConfig.comissaoApp;
                 const taxaCartaoItem = p.ifoodCardFee !== undefined && p.ifoodCardFee !== null ? p.ifoodCardFee : ifoodConfig.taxaCartao;
                 const custoEntregaItem = p.ifoodFixedDelivery !== undefined && p.ifoodFixedDelivery !== null ? p.ifoodFixedDelivery : ifoodConfig.custoEntrega;
 
                 const isPrecoManual = p.ifoodPrice !== undefined && p.ifoodPrice !== null;
-                
+
                 const D_rate = (impostoItem + comissaoAppItem + taxaCartaoItem + ifoodConfig.recebidosLoja) / 100;
                 const divisor = Math.max(0.1, 1 - D_rate);
                 const precoSugeridoIfood = (precoFinal(p) + custoEntregaItem) / divisor;
@@ -403,11 +401,10 @@ export default function ProdutosPage() {
                           <span className={`badge ${p.ativo ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600' : 'bg-stone-100 text-stone-500'}`}>
                             {p.ativo ? 'Ativo' : 'Inativo'}
                           </span>
-                          <span className={`badge border ${
-                            p.isIfoodEnabled
+                          <span className={`badge border ${p.isIfoodEnabled
                               ? 'bg-orange-50 dark:bg-orange-950/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-900/30'
                               : 'bg-stone-50 text-stone-400 border-stone-200'
-                          }`}>
+                            }`}>
                             {p.isIfoodEnabled ? '🌐 iFood Ativo' : '🌐 iFood Inativo'}
                           </span>
                         </div>
@@ -542,13 +539,13 @@ export default function ProdutosPage() {
                 const pesoTotal = calcPesoTotal(p);
                 const precoSugeridoItem = precoSugerido(p);
                 const precoVenda = precoFinal(p);
-                
+
                 const isPrecoManual = p.precoVenda !== undefined && p.precoVenda !== null;
-                
+
                 const lucro = precoVenda - custo;
                 const cmv = precoVenda > 0 ? (custo / precoVenda) * 100 : 0;
                 const margemReal = precoVenda > 0 ? (lucro / precoVenda) * 100 : 0;
-                
+
                 const cmvOk = cmv <= config.cmvMaximo;
                 const margemOk = margemReal >= p.margemLucro;
 
@@ -679,18 +676,18 @@ export default function ProdutosPage() {
       {showForm && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-hidden animate-in fade-in duration-200">
           <div className="bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-850 rounded-2xl shadow-2xl w-full max-w-2xl p-6 space-y-5 relative max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
-            <button 
+            <button
               onClick={() => { setShowForm(false); setEditing(null); }}
               className="absolute top-4 right-4 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 text-lg p-1 transition-colors"
               title="Fechar"
             >
               ✕
             </button>
-            
+
             <h2 className="font-display text-xl font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
               {editing ? '🍽️ Editar Produto' : '✨ Novo Produto'}
             </h2>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="md:col-span-2">
                 <label className="label text-stone-500 dark:text-stone-400 font-semibold text-xs uppercase mb-1">Nome *</label>
@@ -896,14 +893,14 @@ export default function ProdutosPage() {
                   Adicionar
                 </button>
               </div>
-              
+
               {form.insumos.length > 0 ? (
                 <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
                   {form.insumos.map((pi) => {
                     const ins = state.insumos.find((i) => i.id === pi.insumoId);
                     const sub = ins
                       ? (ins.custoEmbalagem / ins.quantidadeEmbalagem) *
-                        pi.quantidade
+                      pi.quantidade
                       : 0;
                     return (
                       <div
@@ -948,12 +945,7 @@ export default function ProdutosPage() {
                   color: 'text-blue-600 dark:text-blue-400',
                   bg: 'bg-blue-50 dark:bg-blue-950/20 border border-blue-100/60 dark:border-blue-900/30',
                 },
-                {
-                  label: 'Preço Final',
-                  value: fmt(form.precoVenda ?? sugerido),
-                  color: 'text-emerald-600 dark:text-emerald-400',
-                  bg: 'bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100/60 dark:border-emerald-900/30',
-                },
+
                 ...(form.isIfoodEnabled ? [
                   {
                     label: 'Preço iFood Final',
@@ -999,14 +991,14 @@ export default function ProdutosPage() {
       {showCategoryManager && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-hidden animate-in fade-in duration-200">
           <div className="bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-850 rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5 relative max-h-[85vh] overflow-y-auto animate-in zoom-in-95 duration-200">
-            <button 
+            <button
               onClick={() => { setShowCategoryManager(false); setEditingCatId(null); }}
               className="absolute top-4 right-4 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 text-lg p-1 transition-colors"
               title="Fechar"
             >
               ✕
             </button>
-            
+
             <h2 className="font-display text-xl font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2 border-b pb-3 border-stone-100 dark:border-neutral-800">
               📁 Gerenciar Categorias
             </h2>
@@ -1021,7 +1013,7 @@ export default function ProdutosPage() {
                   onChange={(e) => setNewCatName(e.target.value)}
                   placeholder="Ex: Bebidas, Sobremesas..."
                 />
-                <button 
+                <button
                   className="btn-primary px-4 py-2 text-sm shrink-0"
                   onClick={handleAddCategory}
                 >
@@ -1038,8 +1030,8 @@ export default function ProdutosPage() {
               ) : (
                 <div className="space-y-1.5">
                   {state.categorias.map((cat) => (
-                    <div 
-                      key={cat.id} 
+                    <div
+                      key={cat.id}
                       className="flex items-center justify-between bg-stone-50 dark:bg-neutral-800/40 border border-stone-150 dark:border-neutral-800 rounded-xl px-3 py-2 text-sm transition-all"
                     >
                       {editingCatId === cat.id ? (
@@ -1049,13 +1041,13 @@ export default function ProdutosPage() {
                             value={editingCatName}
                             onChange={(e) => setEditingCatName(e.target.value)}
                           />
-                          <button 
+                          <button
                             className="text-emerald-500 hover:text-emerald-700 text-xs px-1.5 font-bold"
                             onClick={() => handleUpdateCategory(cat.id)}
                           >
                             Salvar
                           </button>
-                          <button 
+                          <button
                             className="text-stone-400 hover:text-stone-600 text-xs px-1.5"
                             onClick={() => setEditingCatId(null)}
                           >
