@@ -46,6 +46,7 @@ export default function ProdutosPage() {
   const [editingCatName, setEditingCatName] = useState('');
 
   const [activeTab, setActiveTab] = useState<'geral' | 'ifood'>('geral');
+  const [showIfoodGlobalConfig, setShowIfoodGlobalConfig] = useState(false);
   const [ifoodConfig, setIfoodConfig] = useState({
     imposto: 6.00,
     comissaoApp: 12.00,
@@ -259,7 +260,7 @@ export default function ProdutosPage() {
           </button>
           <button
             className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${activeTab === 'ifood'
-                ? 'border-orange-500 text-orange-500 dark:border-orange-500'
+                ? 'border-red-600 text-red-600 dark:border-red-500 dark:text-red-400 dark:border-red-500'
                 : 'border-transparent text-stone-500 hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200'
               }`}
             onClick={() => setActiveTab('ifood')}
@@ -270,93 +271,110 @@ export default function ProdutosPage() {
 
         {/* iFood Global Settings Panel */}
         {activeTab === 'ifood' && (
-          <div className="bg-stone-50 dark:bg-neutral-900/60 border border-orange-200/60 dark:border-orange-950/40 rounded-2xl p-5 space-y-4 shadow-sm animate-in fade-in duration-200">
-            <div className="flex items-center justify-between border-b border-stone-200/60 dark:border-neutral-800/80 pb-3">
+          <div className="bg-stone-50 dark:bg-neutral-900/60 border border-red-200/60 dark:border-red-950/40 rounded-2xl p-5 space-y-4 shadow-sm animate-in fade-in duration-200">
+            <button
+              onClick={() => setShowIfoodGlobalConfig(!showIfoodGlobalConfig)}
+              className="flex items-center justify-between w-full text-left focus:outline-none"
+            >
               <div className="flex items-center gap-2">
                 <span className="text-xl">⚙️</span>
                 <h2 className="font-display text-sm font-bold uppercase tracking-wider text-stone-750 dark:text-stone-250">
-                  Variáveis do Canal iFood
+                  Variáveis Globais do Canal iFood
                 </h2>
               </div>
-              <span className="text-[10px] uppercase text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 border border-orange-100 dark:border-orange-900/20 px-2.5 py-1 rounded-full font-bold">
-                Configurações Ativas
-              </span>
-            </div>
+              <div className="flex items-center gap-2.5">
+                <span className="text-[10px] uppercase text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-100 dark:border-red-900/20 px-2.5 py-1 rounded-full font-bold">
+                  {showIfoodGlobalConfig ? 'Ocultar Taxas' : 'Ajustar Taxas Globais'}
+                </span>
+                <svg
+                  className={`w-4 h-4 text-stone-400 dark:text-stone-500 transition-transform duration-200 ${
+                    showIfoodGlobalConfig ? 'transform rotate-180' : ''
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </button>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-1.5">
-                  Imposto (%)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input border-orange-200 dark:border-orange-900/20 focus:border-orange-500 focus:ring-orange-500/20 font-mono text-sm bg-white dark:bg-neutral-800 text-orange-600 dark:text-orange-400 font-bold"
-                  value={ifoodConfig.imposto}
-                  onChange={(e) => updateIfoodConfig({ imposto: Number(e.target.value) })}
-                />
+            {showIfoodGlobalConfig && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 pt-4 border-t border-stone-200/60 dark:border-neutral-800/80 animate-in slide-in-from-top-2 duration-200">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-1.5">
+                    Imposto (%)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="input border-red-200 dark:border-red-900/20 focus:border-red-500 focus:ring-red-500/20 font-mono text-sm bg-white dark:bg-neutral-800 text-red-600 dark:text-red-400 font-bold"
+                    value={ifoodConfig.imposto}
+                    onChange={(e) => updateIfoodConfig({ imposto: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-1.5">
+                    Comissão App (%)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="input border-red-200 dark:border-red-900/20 focus:border-red-500 focus:ring-red-500/20 font-mono text-sm bg-white dark:bg-neutral-800 text-red-600 dark:text-red-400 font-bold"
+                    value={ifoodConfig.comissaoApp}
+                    onChange={(e) => updateIfoodConfig({ comissaoApp: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-1.5">
+                    Taxa Cartão (%)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="input border-red-200 dark:border-red-900/20 focus:border-red-500 focus:ring-red-500/20 font-mono text-sm bg-white dark:bg-neutral-800 text-red-600 dark:text-red-400 font-bold"
+                    value={ifoodConfig.taxaCartao}
+                    onChange={(e) => updateIfoodConfig({ taxaCartao: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-1.5">
+                    Recebidos Loja (%)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="input border-red-200 dark:border-red-900/20 focus:border-red-500 focus:ring-red-500/20 font-mono text-sm bg-white dark:bg-neutral-800 text-red-600 dark:text-red-400 font-bold"
+                    value={ifoodConfig.recebidosLoja}
+                    onChange={(e) => updateIfoodConfig({ recebidosLoja: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-1.5">
+                    Entrega Fixo (R$)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="input border-red-200 dark:border-red-900/20 focus:border-red-500 focus:ring-red-500/20 font-mono text-sm bg-white dark:bg-neutral-800 text-red-600 dark:text-red-400 font-bold"
+                    value={ifoodConfig.custoEntrega}
+                    onChange={(e) => updateIfoodConfig({ custoEntrega: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-1.5">
+                    Ticket Médio (R$)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="input border-red-200 dark:border-red-900/20 focus:border-red-500 focus:ring-red-500/20 font-mono text-sm bg-white dark:bg-neutral-800 text-red-600 dark:text-red-400 font-bold"
+                    value={ifoodConfig.ticketMedio}
+                    onChange={(e) => updateIfoodConfig({ ticketMedio: Number(e.target.value) })}
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-1.5">
-                  Comissão App (%)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input border-orange-200 dark:border-orange-900/20 focus:border-orange-500 focus:ring-orange-500/20 font-mono text-sm bg-white dark:bg-neutral-800 text-orange-600 dark:text-orange-400 font-bold"
-                  value={ifoodConfig.comissaoApp}
-                  onChange={(e) => updateIfoodConfig({ comissaoApp: Number(e.target.value) })}
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-1.5">
-                  Taxa Cartão (%)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input border-orange-200 dark:border-orange-900/20 focus:border-orange-500 focus:ring-orange-500/20 font-mono text-sm bg-white dark:bg-neutral-800 text-orange-600 dark:text-orange-400 font-bold"
-                  value={ifoodConfig.taxaCartao}
-                  onChange={(e) => updateIfoodConfig({ taxaCartao: Number(e.target.value) })}
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-1.5">
-                  Recebidos Loja (%)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input border-orange-200 dark:border-orange-900/20 focus:border-orange-500 focus:ring-orange-500/20 font-mono text-sm bg-white dark:bg-neutral-800 text-orange-600 dark:text-orange-400 font-bold"
-                  value={ifoodConfig.recebidosLoja}
-                  onChange={(e) => updateIfoodConfig({ recebidosLoja: Number(e.target.value) })}
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-1.5">
-                  Entrega Fixo (R$)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input border-orange-200 dark:border-orange-900/20 focus:border-orange-500 focus:ring-orange-500/20 font-mono text-sm bg-white dark:bg-neutral-800 text-orange-600 dark:text-orange-400 font-bold"
-                  value={ifoodConfig.custoEntrega}
-                  onChange={(e) => updateIfoodConfig({ custoEntrega: Number(e.target.value) })}
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-1.5">
-                  Ticket Médio (R$)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input border-orange-200 dark:border-orange-900/20 focus:border-orange-500 focus:ring-orange-500/20 font-mono text-sm bg-white dark:bg-neutral-800 text-orange-600 dark:text-orange-400 font-bold"
-                  value={ifoodConfig.ticketMedio}
-                  onChange={(e) => updateIfoodConfig({ ticketMedio: Number(e.target.value) })}
-                />
-              </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -390,7 +408,7 @@ export default function ProdutosPage() {
                 const valRecebidosLoja = precoVendaIfood * (ifoodConfig.recebidosLoja / 100);
 
                 return (
-                  <div key={p.id} className={`card p-5 flex flex-col lg:flex-row gap-5 items-stretch border-l-4 ${p.isIfoodEnabled ? 'border-orange-500 hover:shadow-md' : 'border-stone-350 dark:border-neutral-700 opacity-60'} transition-all duration-200`}>
+                  <div key={p.id} className={`card p-5 flex flex-col lg:flex-row gap-5 items-stretch border-l-4 ${p.isIfoodEnabled ? 'border-red-500 hover:shadow-md' : 'border-stone-350 dark:border-neutral-700 opacity-60'} transition-all duration-200`}>
                     {/* Left Side: Product Info */}
                     <div className="flex-1 flex flex-col justify-between space-y-3 min-w-[240px]">
                       <div>
@@ -402,7 +420,7 @@ export default function ProdutosPage() {
                             {p.ativo ? 'Ativo' : 'Inativo'}
                           </span>
                           <span className={`badge border ${p.isIfoodEnabled
-                              ? 'bg-orange-50 dark:bg-orange-950/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-900/30'
+                              ? 'bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/30'
                               : 'bg-stone-50 text-stone-400 border-stone-200'
                             }`}>
                             {p.isIfoodEnabled ? '🌐 iFood Ativo' : '🌐 iFood Inativo'}
@@ -507,10 +525,10 @@ export default function ProdutosPage() {
                         </div>
 
                         {/* Preço de Venda iFood */}
-                        <div className="bg-orange-50/50 dark:bg-orange-950/10 border border-orange-100 dark:border-orange-900/20 rounded-xl p-2.5 flex flex-col justify-between col-span-1">
-                          <span className="text-[10px] text-orange-500 uppercase font-semibold tracking-wider font-bold">Preço iFood</span>
+                        <div className="bg-red-50/50 dark:bg-red-950/10 border border-red-100 dark:border-red-900/20 rounded-xl p-2.5 flex flex-col justify-between col-span-1">
+                          <span className="text-[10px] text-red-500 uppercase font-semibold tracking-wider font-bold">Preço iFood</span>
                           <div className="flex flex-col mt-1">
-                            <span className="font-mono font-bold text-orange-600 dark:text-orange-400 text-sm">
+                            <span className="font-mono font-bold text-red-600 dark:text-red-400 text-sm">
                               {fmt(precoVendaIfood)}
                             </span>
                             {!isPrecoManual ? (
@@ -562,7 +580,7 @@ export default function ProdutosPage() {
                             {p.ativo ? 'Ativo' : 'Inativo'}
                           </span>
                           {p.isIfoodEnabled && (
-                            <span className="badge bg-orange-50 dark:bg-orange-950/20 text-orange-600 dark:text-orange-400 border border-orange-100 dark:border-orange-900/20">
+                            <span className="badge bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/20">
                               🌐 iFood
                             </span>
                           )}
@@ -770,11 +788,11 @@ export default function ProdutosPage() {
                 </label>
               </div>
               <div>
-                <label className="label text-orange-500 font-semibold text-xs uppercase mb-1">Preço Venda iFood (R$)</label>
+                <label className="label text-red-500 font-semibold text-xs uppercase mb-1">Preço Venda iFood (R$)</label>
                 <input
                   type="number"
                   step="0.01"
-                  className="input border-orange-100 dark:border-orange-950/20 focus:border-orange-500 focus:ring-orange-500/20"
+                  className="input border-red-100 dark:border-red-950/20 focus:border-red-500 focus:ring-red-500/20"
                   value={form.ifoodPrice ?? ''}
                   onChange={(e) =>
                     setForm((f) => ({
@@ -786,11 +804,11 @@ export default function ProdutosPage() {
                 />
               </div>
               <div>
-                <label className="label text-orange-500 font-semibold text-xs uppercase mb-1">Imposto iFood (%)</label>
+                <label className="label text-red-500 font-semibold text-xs uppercase mb-1">Imposto iFood (%)</label>
                 <input
                   type="number"
                   step="0.01"
-                  className="input border-orange-100 dark:border-orange-950/20 focus:border-orange-500 focus:ring-orange-500/20"
+                  className="input border-red-100 dark:border-red-950/20 focus:border-red-500 focus:ring-red-500/20"
                   value={form.ifoodTax ?? ''}
                   onChange={(e) =>
                     setForm((f) => ({
@@ -802,11 +820,11 @@ export default function ProdutosPage() {
                 />
               </div>
               <div>
-                <label className="label text-orange-500 font-semibold text-xs uppercase mb-1">Comissão APP (%)</label>
+                <label className="label text-red-500 font-semibold text-xs uppercase mb-1">Comissão APP (%)</label>
                 <input
                   type="number"
                   step="0.01"
-                  className="input border-orange-100 dark:border-orange-950/20 focus:border-orange-500 focus:ring-orange-500/20"
+                  className="input border-red-100 dark:border-red-950/20 focus:border-red-500 focus:ring-red-500/20"
                   value={form.ifoodAppCommission ?? ''}
                   onChange={(e) =>
                     setForm((f) => ({
@@ -818,11 +836,11 @@ export default function ProdutosPage() {
                 />
               </div>
               <div>
-                <label className="label text-orange-500 font-semibold text-xs uppercase mb-1">Taxa Cartão (%)</label>
+                <label className="label text-red-500 font-semibold text-xs uppercase mb-1">Taxa Cartão (%)</label>
                 <input
                   type="number"
                   step="0.01"
-                  className="input border-orange-100 dark:border-orange-950/20 focus:border-orange-500 focus:ring-orange-500/20"
+                  className="input border-red-100 dark:border-red-950/20 focus:border-red-500 focus:ring-red-500/20"
                   value={form.ifoodCardFee ?? ''}
                   onChange={(e) =>
                     setForm((f) => ({
@@ -834,11 +852,11 @@ export default function ProdutosPage() {
                 />
               </div>
               <div>
-                <label className="label text-orange-500 font-semibold text-xs uppercase mb-1">Entrega Fixo (R$)</label>
+                <label className="label text-red-500 font-semibold text-xs uppercase mb-1">Entrega Fixo (R$)</label>
                 <input
                   type="number"
                   step="0.01"
-                  className="input border-orange-100 dark:border-orange-950/20 focus:border-orange-500 focus:ring-orange-500/20"
+                  className="input border-red-100 dark:border-red-950/20 focus:border-red-500 focus:ring-red-500/20"
                   value={form.ifoodFixedDelivery ?? ''}
                   onChange={(e) =>
                     setForm((f) => ({
@@ -857,7 +875,7 @@ export default function ProdutosPage() {
                     onChange={(e) =>
                       setForm((f) => ({ ...f, isIfoodEnabled: e.target.checked }))
                     }
-                    className="rounded border-stone-300 dark:border-neutral-800 text-orange-600 focus:ring-orange-500 h-4 w-4"
+                    className="rounded border-stone-300 dark:border-neutral-800 text-red-600 focus:ring-red-500 h-4 w-4"
                   />
                   <span className="text-sm font-semibold text-stone-700 dark:text-stone-300">Disponível no iFood</span>
                 </label>
@@ -950,8 +968,8 @@ export default function ProdutosPage() {
                   {
                     label: 'Preço iFood Final',
                     value: fmt(form.ifoodPrice ?? precoSugeridoIfoodModal),
-                    color: 'text-orange-600 dark:text-orange-400',
-                    bg: 'bg-orange-50 dark:bg-orange-950/20 border border-orange-100/60 dark:border-orange-900/30',
+                    color: 'text-red-600 dark:text-red-400',
+                    bg: 'bg-red-50 dark:bg-red-950/20 border border-red-100/60 dark:border-red-900/30',
                   }
                 ] : []),
               ].map((c) => (

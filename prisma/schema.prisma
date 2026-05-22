@@ -188,14 +188,18 @@ model FinancialRecord {
 }
 
 model MonthlyRevenue {
-  id           Int             @id @default(autoincrement())
-  ano          Int
-  mes          Int             // 1-12
-  faturamento  Decimal         @db.Decimal(12, 2)
-  cmvMeta      Decimal         @db.Decimal(5, 4) @default(0.3500)  // 35%
-  lucroMeta    Decimal         @db.Decimal(5, 4) @default(0.2000)  // 20%
-  criadoEm     DateTime        @default(now())
-  atualizadoEm DateTime        @updatedAt
+  id                    Int             @id @default(autoincrement())
+  ano                   Int
+  mes                   Int             // 1-12
+  faturamento           Decimal         @db.Decimal(12, 2)
+  cmvMeta               Decimal         @db.Decimal(5, 4) @default(0.3500)  // 35%
+  lucroMeta             Decimal         @db.Decimal(5, 4) @default(0.2000)  // 20%
+  despesasFixasMeta     Decimal?        @db.Decimal(5, 4)
+  despesasVariaveisMeta Decimal?        @db.Decimal(5, 4)
+  markupMeta            Decimal?        @db.Decimal(5, 2)
+  useManualMarkup       Boolean         @default(false)
+  criadoEm              DateTime        @default(now())
+  atualizadoEm          DateTime        @updatedAt
 
   @@unique([ano, mes])
   @@map("monthly_revenues")

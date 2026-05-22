@@ -28,6 +28,10 @@ export interface MonthlyRevenue {
   faturamento: number;
   cmvMeta?: number;
   lucroMeta?: number;
+  despesasFixasMeta?: number;
+  despesasVariaveisMeta?: number;
+  markupMeta?: number;
+  useManualMarkup?: boolean;
   criadoEm?: string;
   atualizadoEm?: string;
 }

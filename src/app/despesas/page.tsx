@@ -1,8 +1,11 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { calcularMetricasFinanceiras } from '@/utils/finance';
+import { 
+  PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend,
+  ComposedChart, Line
+} from 'recharts';
 import { CategoryType, ExpenseCategory, FinancialRecord, MonthlyRevenue } from '@/types/finance';
 
 const MONTHS = [
@@ -10,14 +13,45 @@ const MONTHS = [
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
 ];
 
-interface EditableRecord {
-  id?: number;
-  descricao: string;
-  valor: number;
-  ano: number;
-  mes: number;
-  categoriaId: number;
-}
+const DEFAULT_FIXED_EXPENSES = [
+  { descricao: 'LUZ', valor: 1000 },
+  { descricao: 'ÁGUA', valor: 0 },
+  { descricao: 'GÁS', valor: 440 },
+  { descricao: 'TAXA', valor: 1800 },
+  { descricao: 'ALUGUEL', valor: 2000 },
+  { descricao: 'SISTEMA', valor: 150 },
+  { descricao: 'INTERNET', valor: 100 },
+  { descricao: 'MAQUINA', valor: 87 },
+  { descricao: 'FUNCIONARIOS', valor: 1800 },
+  { descricao: 'GELO', valor: 28 },
+  { descricao: 'PROLABORE 1', valor: 0 },
+  { descricao: 'PROLABORE 2', valor: 0 },
+  { descricao: 'Gasolina', valor: 800 },
+  { descricao: 'Alimentação de funcionários', valor: 1900 },
+  { descricao: 'Material de limpeza', valor: 100 },
+  { descricao: 'CONTADOR', valor: 400 },
+  { descricao: 'musica', valor: 600 }
+];
+
+const DEFAULT_VARIABLE_EXPENSES = [
+  { descricao: 'SIMPLES', valor: 4.5 },
+  { descricao: 'METODO DE PAGAMENTO', valor: 1.7 }
+];
+
+const DEFAULT_ANNUAL_REVENUES = [
+  { mes: 1, faturamento: 0 },
+  { mes: 2, faturamento: 0 },
+  { mes: 3, faturamento: 80000 },
+  { mes: 4, faturamento: 81333.33 },
+  { mes: 5, faturamento: 76333.33 },
+  { mes: 6, faturamento: 71333.33 },
+  { mes: 7, faturamento: 66333.33 },
+  { mes: 8, faturamento: 61333.33 },
+  { mes: 9, faturamento: 56333.33 },
+  { mes: 10, faturamento: 51333.33 },
+  { mes: 11, faturamento: 46333.33 },
+  { mes: 12, faturamento: 41333.33 }
+];
 
 export default function DespesasPage() {
   const [selectedAno, setSelectedAno] = useState<number>(new Date().getFullYear());
@@ -26,34 +60,58 @@ export default function DespesasPage() {
   // Database lists
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [revenuesList, setRevenuesList] = useState<MonthlyRevenue[]>([]);
+  const [records, setRecords] = useState<any[]>([]); // Todos os records do ano
 
-  // Month values
-  const [faturamentoInput, setFaturamentoInput] = useState<string>('0');
-  const [cmvMetaInput, setCmvMetaInput] = useState<string>('35');
-  const [lucroMetaInput, setLucroMetaInput] = useState<string>('20');
+  // Lançamentos do mês selecionado ativos para edição
+  const [activeRecords, setActiveRecords] = useState<any[]>([]);
 
-  // Dynamic rows form state
-  const [records, setRecords] = useState<EditableRecord[]>([]);
 
-  // Category creation inline state
-  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
-  const [newCatNome, setNewCatNome] = useState('');
-  const [newCatTipo, setNewCatTipo] = useState<CategoryType>('FIXED');
+  // Estados de string locais para a edição do Markup (experiência de digitação fluida)
+  const [lucroInput, setLucroInput] = useState('18.23');
+  const [despesasFixasInput, setDespesasFixasInput] = useState('');
+  const [despesasVariaveisInput, setDespesasVariaveisInput] = useState('');
+  const [cmvInput, setCmvInput] = useState('');
+  const [markupInput, setMarkupInput] = useState('');
 
   // UI state
   const [isLoading, setIsLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error' | null, msg: string }>({ type: null, msg: '' });
+  const [isChartsExpanded, setIsChartsExpanded] = useState(false);
 
   // 1. Fetch Categories and Revenues List (runs on load)
   async function loadMetadata() {
     try {
       const [catsRes, revsRes] = await Promise.all([
-        fetch('/api/finance/categories'),
-        fetch('/api/finance/revenue')
+        fetch('/api/finance/categories', { cache: 'no-store' }),
+        fetch('/api/finance/revenue', { cache: 'no-store' })
       ]);
 
-      const cats = await catsRes.json();
+      let cats = await catsRes.json();
       const revs = await revsRes.json();
+
+      // Ensure both FIXED and VARIABLE category types exist
+      const hasFixed = Array.isArray(cats) && cats.some((c: any) => c.tipo === 'FIXED');
+      const hasVariable = Array.isArray(cats) && cats.some((c: any) => c.tipo === 'VARIABLE');
+
+      if (!hasFixed || !hasVariable) {
+        if (!hasFixed) {
+          await fetch('/api/finance/categories', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nome: 'Despesas Fixas', tipo: 'FIXED' })
+          });
+        }
+        if (!hasVariable) {
+          await fetch('/api/finance/categories', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nome: 'Despesas Variáveis', tipo: 'VARIABLE' })
+          });
+        }
+        
+        const reloadCatsRes = await fetch('/api/finance/categories', { cache: 'no-store' });
+        cats = await reloadCatsRes.json();
+      }
 
       if (Array.isArray(cats)) setCategories(cats);
       if (Array.isArray(revs)) setRevenuesList(revs);
@@ -62,25 +120,15 @@ export default function DespesasPage() {
     }
   }
 
-  useEffect(() => {
-    loadMetadata();
-  }, []);
-
-  // 2. Fetch specific Month records and Revenue
-  async function loadMonthData() {
+  // 2. Fetch records for the selected Year
+  async function loadYearData() {
     setIsLoading(true);
     setSaveStatus({ type: null, msg: '' });
     try {
-      const [recordsRes, revenueRes] = await Promise.all([
-        fetch(`/api/finance/records?ano=${selectedAno}&mes=${selectedMes}`),
-        fetch(`/api/finance/revenue?ano=${selectedAno}&mes=${selectedMes}`)
-      ]);
-
+      const recordsRes = await fetch(`/api/finance/records?ano=${selectedAno}`, { cache: 'no-store' });
       const recordsData = await recordsRes.json();
-      const revenueData = await revenueRes.json();
 
       if (Array.isArray(recordsData)) {
-        // Map decimal strings to numbers
         setRecords(recordsData.map((r: any) => ({
           id: r.id,
           descricao: r.descricao,
@@ -92,47 +140,112 @@ export default function DespesasPage() {
       } else {
         setRecords([]);
       }
-
-      if (revenueData && !revenueData.error) {
-        setFaturamentoInput(revenueData.faturamento.toString());
-        setCmvMetaInput(revenueData.cmvMeta.toString());
-        setLucroMetaInput(revenueData.lucroMeta.toString());
-      } else {
-        setFaturamentoInput('0');
-        setCmvMetaInput('35');
-        setLucroMetaInput('20');
-      }
     } catch (err) {
-      console.error('Error loading month data:', err);
+      console.error('Error loading year data:', err);
     } finally {
       setIsLoading(false);
     }
   }
 
   useEffect(() => {
-    loadMonthData();
-  }, [selectedAno, selectedMes]);
+    loadMetadata();
+  }, []);
 
-  // 3. Dynamic Form Handlers
-  const addRecordRow = (categoriaId: number) => {
-    setRecords(prev => [
+  useEffect(() => {
+    if (categories.length > 0) {
+      loadYearData();
+    }
+  }, [selectedAno, categories]);
+
+  // 3. Build Active Records of the Month
+  useEffect(() => {
+    if (categories.length === 0) return;
+    
+    const fixedCat = categories.find(c => c.tipo === 'FIXED');
+    const variableCat = categories.find(c => c.tipo === 'VARIABLE');
+    if (!fixedCat || !variableCat) return;
+
+    const monthDbRecords = records.filter(r => r.ano === selectedAno && r.mes === selectedMes);
+    if (monthDbRecords.length > 0) {
+      setActiveRecords(monthDbRecords);
+    } else {
+      // Pre-populate with default template in memory
+      const defaults = [
+        ...DEFAULT_FIXED_EXPENSES.map(item => ({
+          descricao: item.descricao,
+          valor: item.valor,
+          ano: selectedAno,
+          mes: selectedMes,
+          categoriaId: fixedCat.id
+        })),
+        ...DEFAULT_VARIABLE_EXPENSES.map(item => ({
+          descricao: item.descricao,
+          valor: item.valor,
+          ano: selectedAno,
+          mes: selectedMes,
+          categoriaId: variableCat.id
+        }))
+      ];
+      setActiveRecords(defaults);
+    }
+  }, [records, selectedMes, selectedAno, categories]);
+
+  // 4. Build 12 months faturamento state
+  const annualRevenues = useMemo(() => {
+    return Array.from({ length: 12 }, (_, i) => {
+      const mesNum = i + 1;
+      const dbRev = revenuesList.find(r => r.ano === selectedAno && r.mes === mesNum);
+      const defaultRev = DEFAULT_ANNUAL_REVENUES.find(d => d.mes === mesNum);
+      
+      return {
+        ano: selectedAno,
+        mes: mesNum,
+        faturamento: dbRev ? dbRev.faturamento : (defaultRev ? defaultRev.faturamento : 0),
+        cmvMeta: dbRev?.cmvMeta !== undefined && dbRev.cmvMeta !== null ? dbRev.cmvMeta : 37.50,
+        lucroMeta: dbRev?.lucroMeta !== undefined && dbRev.lucroMeta !== null ? dbRev.lucroMeta : 18.23,
+        despesasFixasMeta: dbRev?.despesasFixasMeta ?? null,
+        despesasVariaveisMeta: dbRev?.despesasVariaveisMeta ?? null,
+        markupMeta: dbRev?.markupMeta ?? null,
+        useManualMarkup: dbRev?.useManualMarkup ?? false
+      };
+    });
+  }, [revenuesList, selectedAno]);
+
+  // Tabela anual (Jan a Dez) de faturamento
+  const [annualRevenuesState, setAnnualRevenuesState] = useState<any[]>(annualRevenues);
+
+  const [prevRevenuesList, setPrevRevenuesList] = useState(revenuesList);
+  const [prevSelectedAno, setPrevSelectedAno] = useState(selectedAno);
+
+  if (revenuesList !== prevRevenuesList || selectedAno !== prevSelectedAno) {
+    setPrevRevenuesList(revenuesList);
+    setPrevSelectedAno(selectedAno);
+    setAnnualRevenuesState(annualRevenues);
+  }
+
+  // 5. Input Handlers for active month list
+  const addRecordRow = (tipo: CategoryType) => {
+    const cat = categories.find(c => c.tipo === tipo);
+    if (!cat) return;
+
+    setActiveRecords(prev => [
       ...prev,
       {
         descricao: '',
         valor: 0,
         ano: selectedAno,
         mes: selectedMes,
-        categoriaId
+        categoriaId: cat.id
       }
     ]);
   };
 
   const removeRecordRow = (index: number) => {
-    setRecords(prev => prev.filter((_, idx) => idx !== index));
+    setActiveRecords(prev => prev.filter((_, idx) => idx !== index));
   };
 
   const updateRecordRow = (index: number, field: 'descricao' | 'valor', value: any) => {
-    setRecords(prev => prev.map((item, idx) => {
+    setActiveRecords(prev => prev.map((item, idx) => {
       if (idx === index) {
         return {
           ...item,
@@ -143,61 +256,252 @@ export default function DespesasPage() {
     }));
   };
 
-  // 4. Create Dynamic Category Handler
-  const handleCreateCategory = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCatNome.trim()) return;
-
-    try {
-      const res = await fetch('/api/finance/categories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nome: newCatNome.trim(), tipo: newCatTipo })
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        setCategories(prev => [...prev, data].sort((a, b) => a.nome.localeCompare(b.nome)));
-        setNewCatNome('');
-        setIsCreatingCategory(false);
-      } else {
-        alert(data.error || 'Erro ao criar categoria');
+  // 6. Update Faturamento for a month in annual list
+  const updateAnnualRevenueValue = (index: number, val: string) => {
+    const floatVal = parseFloat(val) || 0;
+    setAnnualRevenuesState(prev => prev.map((item, idx) => {
+      if (idx === index) {
+        return { ...item, faturamento: floatVal };
       }
-    } catch (err) {
-      console.error('Error creating category:', err);
+      return item;
+    }));
+  };
+
+  // 7. Update Active Month Meta Parameter (Lucro, CMV, manual fields)
+  const updateActiveMonthField = (field: string, value: any) => {
+    setAnnualRevenuesState(prev => prev.map((item, idx) => {
+      if (idx === selectedMes - 1) {
+        return { ...item, [field]: value };
+      }
+      return item;
+    }));
+  };
+
+  // 8. Calculations for Active Month
+  const activeMonthRevenue = useMemo(() => {
+    return annualRevenuesState[selectedMes - 1] || {
+      faturamento: 0,
+      cmvMeta: 37.50,
+      lucroMeta: 18.23,
+      despesasFixasMeta: null,
+      despesasVariaveisMeta: null,
+      markupMeta: null,
+      useManualMarkup: false
+    };
+  }, [annualRevenuesState, selectedMes]);
+
+  const faturamentoValor = activeMonthRevenue.faturamento;
+  const lucroMetaValor = activeMonthRevenue.lucroMeta;
+  const useManualMarkup = activeMonthRevenue.useManualMarkup;
+
+  // Split active month records into fixed and variable totals
+  const aggregatedMetrics = useMemo(() => {
+    let custosFixosTotal = 0;
+    let custosVariaveisTaxa = 0;
+
+    const fixedCat = categories.find(c => c.tipo === 'FIXED');
+    const variableCat = categories.find(c => c.tipo === 'VARIABLE');
+
+    activeRecords.forEach(r => {
+      if (fixedCat && r.categoriaId === fixedCat.id) {
+        custosFixosTotal += r.valor;
+      } else if (variableCat && r.categoriaId === variableCat.id) {
+        custosVariaveisTaxa += r.valor;
+      }
+    });
+
+    return { custosFixosTotal, custosVariaveisTaxa };
+  }, [activeRecords, categories]);
+
+  // Calculate default dynamic percentages
+  const dfPercentCalculado = faturamentoValor > 0 
+    ? (aggregatedMetrics.custosFixosTotal / faturamentoValor) * 100 
+    : 0;
+  const dvPercentCalculado = aggregatedMetrics.custosVariaveisTaxa;
+  
+  const cmvPercentCalculado = activeMonthRevenue.cmvMeta ?? 37.50;
+  const markupCalculado = cmvPercentCalculado > 0 ? 100 / cmvPercentCalculado : 0;
+
+  // Resolve active display metrics
+  const dfPercent = activeMonthRevenue.despesasFixasMeta !== null && activeMonthRevenue.despesasFixasMeta !== undefined
+    ? activeMonthRevenue.despesasFixasMeta
+    : dfPercentCalculado;
+
+  const dvPercent = activeMonthRevenue.despesasVariaveisMeta !== null && activeMonthRevenue.despesasVariaveisMeta !== undefined
+    ? activeMonthRevenue.despesasVariaveisMeta
+    : dvPercentCalculado;
+
+  const cmvPercent = activeMonthRevenue.cmvMeta !== null && activeMonthRevenue.cmvMeta !== undefined
+    ? activeMonthRevenue.cmvMeta
+    : 37.50;
+
+  const markupValue = activeMonthRevenue.markupMeta !== null && activeMonthRevenue.markupMeta !== undefined
+    ? activeMonthRevenue.markupMeta
+    : (cmvPercent > 0 ? 100 / cmvPercent : 0);
+
+  const totalPercent = lucroMetaValor + dfPercent + dvPercent + cmvPercent;
+
+  // 9. Synchronize text inputs local state (only when selected month/year, override toggle, or DB data list changes)
+  useEffect(() => {
+    if (activeMonthRevenue) {
+      setLucroInput(activeMonthRevenue.lucroMeta !== undefined && activeMonthRevenue.lucroMeta !== null 
+        ? activeMonthRevenue.lucroMeta.toFixed(2)
+        : '18.23');
+      
+      const dfVal = activeMonthRevenue.despesasFixasMeta !== null && activeMonthRevenue.despesasFixasMeta !== undefined
+        ? activeMonthRevenue.despesasFixasMeta
+        : dfPercentCalculado;
+      setDespesasFixasInput(dfVal.toFixed(2));
+
+      const dvVal = activeMonthRevenue.despesasVariaveisMeta !== null && activeMonthRevenue.despesasVariaveisMeta !== undefined
+        ? activeMonthRevenue.despesasVariaveisMeta
+        : dvPercentCalculado;
+      setDespesasVariaveisInput(dvVal.toFixed(2));
+
+      const cmvVal = activeMonthRevenue.cmvMeta !== null && activeMonthRevenue.cmvMeta !== undefined
+        ? activeMonthRevenue.cmvMeta
+        : 37.50;
+      setCmvInput(cmvVal.toFixed(2));
+
+      const mkVal = activeMonthRevenue.markupMeta !== null && activeMonthRevenue.markupMeta !== undefined
+        ? activeMonthRevenue.markupMeta
+        : (cmvVal > 0 ? 100 / cmvVal : 0);
+      setMarkupInput(mkVal.toFixed(2));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMes, selectedAno, useManualMarkup, revenuesList]);
+
+  const updateActiveMonthFields = (fields: Record<string, any>) => {
+    setAnnualRevenuesState(prev => prev.map((item, idx) => {
+      if (idx === selectedMes - 1) {
+        return { ...item, ...fields };
+      }
+      return item;
+    }));
+  };
+
+  // 10. Handlers of manual string input changes (independent typing, no linked updates)
+  const handleLucroChange = (val: string) => {
+    setLucroInput(val);
+    const sanitized = val.replace(',', '.');
+    const num = parseFloat(sanitized);
+    if (!isNaN(num)) {
+      updateActiveMonthFields({ lucroMeta: num });
+    } else if (val === '') {
+      updateActiveMonthFields({ lucroMeta: 0 });
     }
   };
 
-  // 5. Save all inputs for the active month
+  const handleDFChange = (val: string) => {
+    setDespesasFixasInput(val);
+    const sanitized = val.replace(',', '.');
+    const num = parseFloat(sanitized);
+    if (!isNaN(num)) {
+      updateActiveMonthFields({ despesasFixasMeta: num });
+    } else if (val === '') {
+      updateActiveMonthFields({ despesasFixasMeta: 0 });
+    }
+  };
+
+  const handleDVChange = (val: string) => {
+    setDespesasVariaveisInput(val);
+    const sanitized = val.replace(',', '.');
+    const num = parseFloat(sanitized);
+    if (!isNaN(num)) {
+      updateActiveMonthFields({ despesasVariaveisMeta: num });
+    } else if (val === '') {
+      updateActiveMonthFields({ despesasVariaveisMeta: 0 });
+    }
+  };
+
+  const handleCmvChange = (val: string) => {
+    setCmvInput(val);
+    const sanitized = val.replace(',', '.');
+    const num = parseFloat(sanitized);
+    if (!isNaN(num)) {
+      const calculatedMarkup = num > 0 ? 100 / num : 0;
+      setMarkupInput(calculatedMarkup > 0 ? calculatedMarkup.toFixed(2) : '0.00');
+      updateActiveMonthFields({ 
+        cmvMeta: num,
+        markupMeta: parseFloat(calculatedMarkup.toFixed(4))
+      });
+    } else if (val === '') {
+      setMarkupInput('0.00');
+      updateActiveMonthFields({ 
+        cmvMeta: 0,
+        markupMeta: 0
+      });
+    }
+  };
+
+  const handleMarkupChange = (val: string) => {
+    setMarkupInput(val);
+    const sanitized = val.replace(',', '.');
+    const num = parseFloat(sanitized);
+    if (!isNaN(num)) {
+      const calculatedCmv = num > 0 ? 100 / num : 0;
+      setCmvInput(calculatedCmv > 0 ? calculatedCmv.toFixed(2) : '0.00');
+      updateActiveMonthFields({ 
+        markupMeta: num,
+        cmvMeta: parseFloat(calculatedCmv.toFixed(4))
+      });
+    } else if (val === '') {
+      setCmvInput('0.00');
+      updateActiveMonthFields({ 
+        markupMeta: 0,
+        cmvMeta: 0
+      });
+    }
+  };
+
+  // 11. Toggle Manual Override
+  const toggleManualMarkup = (checked: boolean) => {
+    setAnnualRevenuesState(prev => prev.map((item, idx) => {
+      if (idx === selectedMes - 1) {
+        const lucroMetaVal = item.lucroMeta ?? parseFloat(lucroMetaValor.toFixed(2));
+        const dfMetaVal = item.despesasFixasMeta ?? parseFloat(dfPercentCalculado.toFixed(2));
+        const dvMetaVal = item.despesasVariaveisMeta ?? parseFloat(dvPercentCalculado.toFixed(2));
+        const cmvMetaVal = item.cmvMeta ?? parseFloat(cmvPercentCalculado.toFixed(2));
+        const markupMetaVal = item.markupMeta ?? parseFloat((cmvMetaVal > 0 ? 100 / cmvMetaVal : 0).toFixed(2));
+
+        return {
+          ...item,
+          useManualMarkup: checked,
+          cmvMeta: checked ? cmvMetaVal : item.cmvMeta,
+          lucroMeta: checked ? lucroMetaVal : item.lucroMeta,
+          despesasFixasMeta: checked ? dfMetaVal : item.despesasFixasMeta,
+          despesasVariaveisMeta: checked ? dvMetaVal : item.despesasVariaveisMeta,
+          markupMeta: checked ? markupMetaVal : item.markupMeta,
+        };
+      }
+      return item;
+    }));
+  };
+
+  // 12. Save all data (Bulk revenues + active records)
   const handleSaveAll = async () => {
     setIsLoading(true);
     setSaveStatus({ type: null, msg: '' });
 
     try {
-      // 5.1 Save monthly revenue parameters
+      // 12.1 Save all annual faturamentos and goals for the selected year
       const revenueRes = await fetch('/api/finance/revenue', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ano: selectedAno,
-          mes: selectedMes,
-          faturamento: parseFloat(faturamentoInput) || 0,
-          cmvMeta: parseFloat(cmvMetaInput) || 0,
-          lucroMeta: parseFloat(lucroMetaInput) || 0
-        })
+        body: JSON.stringify(annualRevenuesState)
       });
 
       if (!revenueRes.ok) {
         const errData = await revenueRes.json();
-        throw new Error(errData.error || 'Erro ao salvar parâmetros de faturamento');
+        throw new Error(errData.error || 'Erro ao salvar faturamento anual');
       }
 
-      // 5.2 Save records
+      // 12.2 Save fixed/variable records for the active month
       const recordsRes = await fetch('/api/finance/records', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
-          records.map(r => ({
+          activeRecords.map(r => ({
             descricao: r.descricao || 'Item sem descrição',
             valor: r.valor,
             ano: selectedAno,
@@ -212,10 +516,11 @@ export default function DespesasPage() {
         throw new Error(errData.error || 'Erro ao salvar lançamentos de custos');
       }
 
-      setSaveStatus({ type: 'success', msg: 'Gestão Financeira salva com sucesso!' });
-      // Reload lists to reflect update in acumulado
-      loadMetadata();
-      loadMonthData();
+      setSaveStatus({ type: 'success', msg: 'Gestão Financeira e metas salvas com sucesso!' });
+      
+      // Reload everything
+      await loadMetadata();
+      await loadYearData();
     } catch (err: any) {
       setSaveStatus({ type: 'error', msg: err.message || 'Falha ao salvar dados' });
     } finally {
@@ -223,477 +528,645 @@ export default function DespesasPage() {
     }
   };
 
-  // 6. Real-time Calculations (Reactive to inputs and unsaved form states)
-  const faturamentoValor = parseFloat(faturamentoInput) || 0;
-  const cmvMetaValor = parseFloat(cmvMetaInput) || 0;
-  const lucroMetaValor = parseFloat(lucroMetaInput) || 0;
-
-  // Split records into FIXED and VARIABLE to aggregate
-  const aggregatedMetrics = useMemo(() => {
-    let custosFixosTotal = 0;
-    let custosVariaveisTaxa = 0;
+  // 13. Dynamic calculations for yearly graphs (based on year data array)
+  const monthlyFixedCostsSum = useMemo(() => {
+    const sums = Array(12).fill(0);
+    const fixedCat = categories.find(c => c.tipo === 'FIXED');
+    if (!fixedCat) return sums;
 
     records.forEach(r => {
-      const cat = categories.find(c => c.id === r.categoriaId);
-      if (cat) {
-        if (cat.tipo === 'FIXED') {
-          custosFixosTotal += r.valor;
-        } else if (cat.tipo === 'VARIABLE') {
-          custosVariaveisTaxa += r.valor;
-        }
+      if (r.categoriaId === fixedCat.id && r.mes >= 1 && r.mes <= 12) {
+        sums[r.mes - 1] += r.valor;
       }
     });
 
-    return { custosFixosTotal, custosVariaveisTaxa };
-  }, [records, categories]);
+    // Fallback template for months with zero db records
+    const defaultFixedTotal = DEFAULT_FIXED_EXPENSES.reduce((sum, item) => sum + item.valor, 0);
 
-  const financeCalculations = useMemo(() => {
-    return calcularMetricasFinanceiras({
-      faturamentoMensal: faturamentoValor,
-      custosFixosTotal: aggregatedMetrics.custosFixosTotal,
-      custosVariaveisTaxa: aggregatedMetrics.custosVariaveisTaxa,
-      cmvMetaTaxa: cmvMetaValor,
-      lucroMetaTaxa: lucroMetaValor
-    });
-  }, [faturamentoValor, aggregatedMetrics, cmvMetaValor, lucroMetaValor]);
-
-  // 7. Faturamento Acumulado Anual calculation
-  const faturamentoAcumuladoAnual = useMemo(() => {
-    return revenuesList
-      .filter(r => r.ano === selectedAno)
-      .reduce((sum, r) => sum + Number(r.faturamento), 0);
-  }, [revenuesList, selectedAno]);
-
-  // 8. Recharts Donut data source (reactive)
-  const pieData = useMemo(() => {
-    const data = [
-      {
-        name: 'Custos Fixos (%DF)',
-        value: financeCalculations.percentualDespesasFixas,
-        color: '#2563eb' // Blue
-      },
-      {
-        name: 'Custos Variáveis (%DV)',
-        value: financeCalculations.percentualDespesasVariaveis,
-        color: '#d97706' // Amber
-      },
-      {
-        name: 'CMV Meta (%)',
-        value: cmvMetaValor,
-        color: '#dc2626' // Red
-      },
-      {
-        name: 'Lucro Desejado (%)',
-        value: lucroMetaValor,
-        color: '#16a34a' // Green
+    for (let m = 0; m < 12; m++) {
+      const hasRecords = records.some(r => r.mes === m + 1);
+      if (!hasRecords) {
+        sums[m] = defaultFixedTotal;
       }
-    ];
-
-    // Se a soma for menor que 100%, preenchemos a "Margem de Contribuição Livre / Buffer"
-    const totalSlices = financeCalculations.percentualDespesasFixas + financeCalculations.percentualDespesasVariaveis + cmvMetaValor + lucroMetaValor;
-    if (totalSlices < 100) {
-      data.push({
-        name: 'Margem Excedente (%)',
-        value: parseFloat((100 - totalSlices).toFixed(4)),
-        color: '#6b7280' // Gray
-      });
     }
 
-    return data.filter(slice => slice.value > 0);
-  }, [financeCalculations, cmvMetaValor, lucroMetaValor]);
-
-  // Format Helper BRL
-  const fmtBRL = (n: number) =>
-    n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-  // Separate records grouped by category for rendering
-  const recordsByCategory = useMemo(() => {
-    const grouped: Record<number, typeof records> = {};
-    categories.forEach(c => {
-      grouped[c.id] = records.filter(r => r.categoriaId === c.id);
-    });
-    return grouped;
+    return sums;
   }, [records, categories]);
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-8 animate-in text-stone-800 dark:text-stone-100">
+  const monthlyVariableRatesSum = useMemo(() => {
+    const rates = Array(12).fill(0);
+    const variableCat = categories.find(c => c.tipo === 'VARIABLE');
+    if (!variableCat) return rates;
+
+    records.forEach(r => {
+      if (r.categoriaId === variableCat.id && r.mes >= 1 && r.mes <= 12) {
+        rates[r.mes - 1] += r.valor;
+      }
+    });
+
+    const defaultVarTotal = DEFAULT_VARIABLE_EXPENSES.reduce((sum, item) => sum + item.valor, 0);
+
+    for (let m = 0; m < 12; m++) {
+      const hasRecords = records.some(r => r.mes === m + 1);
+      if (!hasRecords) {
+        rates[m] = defaultVarTotal;
+      }
+    }
+
+    return rates;
+  }, [records, categories]);
+
+  // Combined annual graph data
+  const yearlyChartData = useMemo(() => {
+    return annualRevenuesState.map((r) => {
+      const m = r.mes - 1;
+      const faturamento = r.faturamento || 0;
       
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      const fixedCosts = monthlyFixedCostsSum[m];
+      const varRate = r.despesasVariaveisMeta !== null 
+        ? r.despesasVariaveisMeta 
+        : monthlyVariableRatesSum[m];
+      
+      const lucroMeta = r.lucroMeta || 18.23;
+      
+      const dfPercent = r.despesasFixasMeta !== null
+        ? r.despesasFixasMeta
+        : (faturamento > 0 ? (fixedCosts / faturamento) * 100 : 0);
+
+      const cmvPercent = r.cmvMeta ?? 37.5;
+
+      const mcPercent = Math.max(0, 100 - (varRate + cmvPercent));
+      const breakEven = mcPercent > 0 ? fixedCosts / (mcPercent / 100) : 0;
+
+      return {
+        name: MONTHS[m].substring(0, 3), // "Jan", "Fev", ...
+        'Faturamento': Math.round(faturamento),
+        'Ponto de Equilíbrio': Math.round(breakEven)
+      };
+    });
+  }, [annualRevenuesState, monthlyFixedCostsSum, monthlyVariableRatesSum]);
+
+  // Monetary values for active month metrics
+  const activeMargemContrib = Math.max(0, 100 - (dvPercent + cmvPercent));
+  const activePontoEquilibrio = activeMargemContrib > 0 ? (aggregatedMetrics.custosFixosTotal / (activeMargemContrib / 100)) : 0;
+  const activeResultadoEstimado = faturamentoValor * (lucroMetaValor / 100);
+  const activeCustoCmvEstimado = faturamentoValor * (cmvPercent / 100);
+  const activeCustoVariavelEstimado = faturamentoValor * (dvPercent / 100);
+  const activeCustosFixos = aggregatedMetrics.custosFixosTotal;
+
+  // Active month monetary breakdown graph data
+  const activeMoneyData = useMemo(() => {
+    return [
+      { name: 'CMV', 'Valor (R$)': Math.round(activeCustoCmvEstimado), color: '#7030a0' },
+      { name: 'Fixo', 'Valor (R$)': Math.round(activeCustosFixos), color: '#c00000' },
+      { name: 'Variável', 'Valor (R$)': Math.round(activeCustoVariavelEstimado), color: '#70ad47' },
+      { name: 'Lucro Est.', 'Valor (R$)': Math.round(activeResultadoEstimado), color: '#4f81bd' }
+    ];
+  }, [activeCustoCmvEstimado, activeCustosFixos, activeCustoVariavelEstimado, activeResultadoEstimado]);
+
+  // Total Annual Revenue sum
+  const totalAnnualRevenueSum = useMemo(() => {
+    return annualRevenuesState.reduce((sum, r) => sum + (r.faturamento || 0), 0);
+  }, [annualRevenuesState]);
+
+  // Pie chart data
+  const pieData = useMemo(() => {
+    return [
+      { name: 'Lucro Desejado', value: lucroMetaValor, color: '#4f81bd' },
+      { name: 'Despesas Fixas', value: dfPercent, color: '#c00000' },
+      { name: 'Despesas Variáveis', value: dvPercent, color: '#70ad47' },
+      { name: 'CMV', value: cmvPercent, color: '#7030a0' }
+    ].filter(slice => slice.value > 0);
+  }, [lucroMetaValor, dfPercent, dvPercent, cmvPercent]);
+
+  // Formatting helpers
+  const fmtBRL = (n: number) =>
+    n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+  const fmtBRLPrecise = (n: number) =>
+    n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  const fmtPercent = (n: number) =>
+    n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+
+  const fixedRecords = useMemo(() => {
+    const cat = categories.find(c => c.tipo === 'FIXED');
+    return cat ? activeRecords.filter(r => r.categoriaId === cat.id) : [];
+  }, [activeRecords, categories]);
+
+  const variableRecords = useMemo(() => {
+    const cat = categories.find(c => c.tipo === 'VARIABLE');
+    return cat ? activeRecords.filter(r => r.categoriaId === cat.id) : [];
+  }, [activeRecords, categories]);
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6 text-stone-800 dark:text-stone-100">
+      
+      {/* Header & Save Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-neutral-900 p-4 rounded-2xl border border-stone-200 dark:border-neutral-800 shadow-sm">
         <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight text-stone-900 dark:text-stone-100">
-            Gestão Financeira
+          <h1 className="font-display text-2xl font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
+            📊 Gestão de Margem e Despesas
           </h1>
-          <p className="text-stone-500 dark:text-stone-400 text-sm mt-1">
-            Planejamento de custos, Markup e Ponto de Equilíbrio.
+          <p className="text-stone-500 dark:text-stone-400 text-xs mt-0.5">
+            Analise despesas fixas, variáveis, faturamento anual, metas comerciais e markup da sua operação.
           </p>
         </div>
 
-        {/* Date Selector */}
-        <div className="flex items-center gap-2 bg-white dark:bg-neutral-900 p-1.5 rounded-xl border border-stone-200 dark:border-neutral-800 shadow-sm shrink-0">
-          <select
-            value={selectedMes}
-            onChange={(e) => setSelectedMes(parseInt(e.target.value))}
-            className="bg-transparent text-sm font-semibold py-1 px-3 border-none outline-none focus:ring-0 text-stone-700 dark:text-stone-200 cursor-pointer"
+        <div className="flex items-center gap-3 self-end md:self-auto">
+          {/* Month/Year selector */}
+          <div className="flex items-center gap-1.5 bg-stone-50 dark:bg-neutral-950 p-1 rounded-xl border border-stone-200 dark:border-neutral-800">
+            <select
+              value={selectedMes}
+              onChange={(e) => setSelectedMes(parseInt(e.target.value))}
+              className="bg-transparent text-xs font-semibold py-1 px-2 border-none outline-none focus:ring-0 text-stone-700 dark:text-stone-200 cursor-pointer"
+            >
+              {MONTHS.map((m, idx) => (
+                <option key={m} value={idx + 1} className="bg-white dark:bg-neutral-900 text-stone-800 dark:text-stone-100">
+                  {m}
+                </option>
+              ))}
+            </select>
+            <div className="w-[1px] h-4 bg-stone-200 dark:bg-neutral-800" />
+            <select
+              value={selectedAno}
+              onChange={(e) => setSelectedAno(parseInt(e.target.value))}
+              className="bg-transparent text-xs font-semibold py-1 px-2 border-none outline-none focus:ring-0 text-stone-700 dark:text-stone-200 cursor-pointer"
+            >
+              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
+                <option key={year} value={year} className="bg-white dark:bg-neutral-900 text-stone-800 dark:text-stone-100">
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={handleSaveAll}
+            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm transition-all hover:scale-[1.02] disabled:opacity-50 flex items-center gap-1.5"
           >
-            {MONTHS.map((m, idx) => (
-              <option key={m} value={idx + 1} className="bg-white dark:bg-neutral-900">
-                {m}
-              </option>
-            ))}
-          </select>
-          <div className="w-[1px] h-5 bg-stone-200 dark:bg-neutral-800" />
-          <select
-            value={selectedAno}
-            onChange={(e) => setSelectedAno(parseInt(e.target.value))}
-            className="bg-transparent text-sm font-semibold py-1 px-3 border-none outline-none focus:ring-0 text-stone-700 dark:text-stone-200 cursor-pointer"
-          >
-            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
-              <option key={year} value={year} className="bg-white dark:bg-neutral-900">
-                {year}
-              </option>
-            ))}
-          </select>
+            {isLoading ? 'Salvando...' : '💾 Salvar Alterações'}
+          </button>
         </div>
       </div>
 
       {/* Save status message */}
       {saveStatus.type && (
-        <div className={`p-4 rounded-xl text-sm border font-medium ${
+        <div className={`p-3.5 rounded-xl text-xs border font-medium transition-all animate-in fade-in-50 duration-200 ${
           saveStatus.type === 'success' 
-            ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/50' 
-            : 'bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/50'
+            ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/50' 
+            : 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-900/50'
         }`}>
-          {saveStatus.msg}
+          {saveStatus.type === 'success' ? '✓ ' : '⚠️ '} {saveStatus.msg}
         </div>
       )}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Card 1: Faturamento Acumulado */}
-        <div className="card p-6 bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 shadow-sm rounded-2xl flex flex-col justify-between">
-          <div>
-            <span className="text-xs text-stone-400 dark:text-stone-500 font-semibold uppercase tracking-wider">
-              Faturamento Acumulado ({selectedAno})
-            </span>
-            <h3 className="font-display text-2xl font-bold mt-1 text-blue-600 dark:text-blue-400">
-              {fmtBRL(faturamentoAcumuladoAnual)}
-            </h3>
-          </div>
-          <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-4">
-            Soma de todos os faturamentos salvos do ano de {selectedAno}.
-          </p>
-        </div>
-
-        {/* Card 2: Custos Fixos totais */}
-        <div className="card p-6 bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 shadow-sm rounded-2xl flex flex-col justify-between">
-          <div>
-            <span className="text-xs text-stone-400 dark:text-stone-500 font-semibold uppercase tracking-wider">
-              Total Custos Fixos (Mês)
-            </span>
-            <h3 className="font-display text-2xl font-bold mt-1 text-amber-600 dark:text-amber-500">
-              {fmtBRL(aggregatedMetrics.custosFixosTotal)}
-            </h3>
-          </div>
-          <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-4">
-            Total absoluto de custos fixos lançados na planilha.
-          </p>
-        </div>
-
-        {/* Card 3: Ponto de Equilibrio */}
-        <div className={`card p-6 border shadow-sm rounded-2xl flex flex-col justify-between ${
-          financeCalculations.insolvente 
-            ? 'bg-red-50/50 dark:bg-red-950/10 border-red-200 dark:border-red-900/50' 
-            : 'bg-white dark:bg-neutral-900 border-stone-200 dark:border-neutral-800'
-        }`}>
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-stone-400 dark:text-stone-500 font-semibold uppercase tracking-wider">
-                Ponto de Equilíbrio
+      {/* Abas e Painel Expansível de Gráficos Analíticos */}
+      <div className="bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 rounded-2xl shadow-sm overflow-hidden transition-all duration-300">
+        <button
+          type="button"
+          onClick={() => setIsChartsExpanded(!isChartsExpanded)}
+          className="w-full flex items-center justify-between p-4 hover:bg-stone-50 dark:hover:bg-neutral-800/40 transition-colors text-left focus:outline-none"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-lg">📊</span>
+            <div>
+              <span className="font-display text-sm font-bold text-stone-900 dark:text-stone-100">
+                Gráficos Extras de Análise e Projeção Financeira
               </span>
-              {financeCalculations.insolvente && (
-                <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-red-600 text-white animate-pulse">
-                  Insolvente
-                </span>
-              )}
+              <span className="block text-[10px] text-stone-450 dark:text-stone-500 mt-0.5">
+                {isChartsExpanded ? 'Clique para ocultar as projeções e gráficos extras' : 'Clique para visualizar a evolução anual e divisão de custos estimada'}
+              </span>
             </div>
-            <h3 className={`font-display text-2xl font-bold mt-1 ${
-              financeCalculations.insolvente ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-500'
-            }`}>
-              {financeCalculations.insolvente ? 'Inviável' : fmtBRL(financeCalculations.pontoEquilibrio)}
-            </h3>
           </div>
-          <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-4">
-            {financeCalculations.insolvente 
-              ? 'Custos percentuais excedem 100%. Impossível cobrir custos.'
-              : 'Faturamento mínimo necessário para cobrir os custos e empatar.'}
-          </p>
-        </div>
+          <span className={`text-stone-400 text-xs transition-transform duration-300 ${isChartsExpanded ? 'rotate-180' : ''}`}>
+            ▼
+          </span>
+        </button>
+
+        {isChartsExpanded && (
+          <div className="p-4 border-t border-stone-150 dark:border-neutral-800 bg-stone-50/50 dark:bg-neutral-950/10 grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in duration-300">
+            {/* Gráfico 1: Divisão de Custos do Mês (R$) */}
+            <div className="bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 rounded-xl p-4 space-y-3 shadow-xs">
+              <h3 className="text-center font-display text-xs font-bold text-stone-800 dark:text-stone-200 uppercase tracking-wider">
+                Divisão de Custos do Mês ({MONTHS[selectedMes - 1]} - R$)
+              </h3>
+              <div className="h-56 w-full">
+                {faturamentoValor === 0 ? (
+                  <div className="h-full flex items-center justify-center text-stone-400 text-xs italic">
+                    Defina um faturamento para ver a projeção em reais.
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={activeMoneyData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5e5" className="dark:stroke-neutral-800" />
+                      <XAxis dataKey="name" tick={{ fontSize: 9 }} stroke="#888888" />
+                      <YAxis tickFormatter={(v) => `R$${v}`} tick={{ fontSize: 9 }} stroke="#888888" />
+                      <Tooltip 
+                        formatter={(v: number) => fmtBRLPrecise(v)}
+                        contentStyle={{ background: '#1c1917', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '10px' }}
+                      />
+                      <Bar dataKey="Valor (R$)" radius={[4, 4, 0, 0]}>
+                        {activeMoneyData.map((entry, idx) => (
+                          <Cell key={`cell-${idx}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+
+            {/* Gráfico 2: Evolução Anual: Faturamento vs Ponto de Equilíbrio */}
+            <div className="bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 rounded-xl p-4 space-y-3 shadow-xs">
+              <h3 className="text-center font-display text-xs font-bold text-stone-800 dark:text-stone-200 uppercase tracking-wider">
+                Evolução Anual: Faturamento vs Ponto de Equilíbrio
+              </h3>
+              <div className="h-56 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={yearlyChartData} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" className="dark:stroke-neutral-800" />
+                    <XAxis dataKey="name" stroke="#888888" tick={{ fontSize: 9 }} />
+                    <YAxis tickFormatter={(v) => `R$ ${v / 1000}k`} stroke="#888888" tick={{ fontSize: 9 }} />
+                    <Tooltip 
+                      formatter={(v: number) => fmtBRLPrecise(v)}
+                      contentStyle={{ background: '#1c1917', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '11px' }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '9px' }} />
+                    <Bar dataKey="Faturamento" fill="#4f81bd" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                    <Line type="monotone" dataKey="Ponto de Equilíbrio" stroke="#c00000" strokeWidth={2.5} dot={{ r: 2.5 }} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Main Panel grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      {/* Excel Sheet Grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
         
-        {/* Left/Middle Columns: Form inputs */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* COLUNA 1: Despesas Fixas (Esquerda) */}
+        <div className="bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 rounded-2xl shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md">
+          {/* Table Header Row 1 */}
+          <div className="bg-red-50 dark:bg-red-950/40 px-4 py-3 flex justify-between items-center text-red-800 dark:text-red-300 font-bold border-b border-red-100 dark:border-red-900/30">
+            <span className="text-sm font-display uppercase tracking-wide text-red-900 dark:text-red-250">Despesas Fixas</span>
+            <span className="text-base font-mono text-red-950 dark:text-red-100">{fmtBRLPrecise(aggregatedMetrics.custosFixosTotal)}</span>
+          </div>
+          {/* Table Header Row 2 */}
+          <div className="bg-stone-100 dark:bg-neutral-800/80 px-4 py-1.5 grid grid-cols-12 text-[10px] font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wide border-b border-stone-200 dark:border-neutral-800">
+            <span className="col-span-8">Descrição</span>
+            <span className="col-span-4 text-right">R$</span>
+          </div>
+
+          {/* Table Body */}
+          <div className="p-3 space-y-1.5 max-h-[600px] overflow-y-auto">
+            {fixedRecords.length === 0 ? (
+              <p className="text-xs text-stone-400 dark:text-stone-500 italic py-4 text-center">
+                Nenhum custo fixo lançado.
+              </p>
+            ) : (
+              activeRecords.map((item, idx) => {
+                const isFixedCat = categories.find(c => c.id === item.categoriaId)?.tipo === 'FIXED';
+                if (!isFixedCat) return null;
+
+                return (
+                  <div key={idx} className="group grid grid-cols-12 gap-2 items-center hover:bg-stone-50 dark:hover:bg-neutral-800/40 p-1 rounded-lg transition-all duration-150">
+                    <input
+                      type="text"
+                      placeholder="Descrição da despesa fixa"
+                      value={item.descricao}
+                      onChange={(e) => updateRecordRow(idx, 'descricao', e.target.value)}
+                      className="col-span-8 bg-transparent border border-transparent hover:border-stone-300 focus:border-stone-400 dark:hover:border-neutral-700 dark:focus:border-neutral-600 rounded-md py-1 px-2 text-xs focus:outline-none text-stone-800 dark:text-stone-200 focus:bg-white dark:focus:bg-neutral-950 transition-all font-medium"
+                    />
+                    
+                    <div className="col-span-3 relative rounded-md">
+                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-1.5">
+                        <span className="text-[10px] text-stone-400">R$</span>
+                      </div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0,00"
+                        value={item.valor || ''}
+                        onChange={(e) => updateRecordRow(idx, 'valor', e.target.value)}
+                        className="w-full text-right bg-transparent border border-transparent hover:border-stone-300 focus:border-stone-400 dark:hover:border-neutral-700 dark:focus:border-neutral-600 rounded-md py-1 pl-5 pr-1.5 text-xs font-mono focus:outline-none text-stone-800 dark:text-stone-200 focus:bg-white dark:focus:bg-neutral-950 transition-all"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => removeRecordRow(idx)}
+                      className="col-span-1 text-center text-[10px] opacity-0 group-hover:opacity-100 text-stone-400 hover:text-red-500 transition-all duration-150"
+                      title="Excluir despesa"
+                    >
+                      ❌
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div className="p-3 bg-stone-50 dark:bg-neutral-900/50 border-t border-stone-200 dark:border-neutral-800 flex justify-end">
+            <button
+              type="button"
+              onClick={() => addRecordRow('FIXED')}
+              className="px-2.5 py-1.5 rounded-lg border border-stone-200 dark:border-neutral-800 hover:bg-white dark:hover:bg-neutral-800 text-[10px] font-bold text-stone-600 dark:text-stone-300 shadow-sm transition-all"
+            >
+              ➕ Adicionar Despesa Fixa
+            </button>
+          </div>
+        </div>
+
+        {/* COLUNA 2: Despesas Variáveis & Faturamento do Ano (Centro) */}
+        <div className="space-y-6">
           
-          {/* Base Revenue configuration */}
-          <div className="p-6 bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 rounded-2xl shadow-sm space-y-4">
-            <h2 className="text-base font-semibold text-stone-900 dark:text-stone-200 flex items-center gap-2">
-              📊 Parâmetros da Receita e Metas
-            </h2>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase mb-1">
-                  Faturamento do Mês (R$)
-                </label>
-                <div className="relative rounded-lg shadow-sm">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                    <span className="text-stone-400 text-sm">R$</span>
-                  </div>
-                  <input
-                    type="number"
-                    value={faturamentoInput}
-                    onChange={(e) => setFaturamentoInput(e.target.value)}
-                    className="block w-full rounded-lg border border-stone-200 dark:border-neutral-800 bg-transparent py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none dark:focus:border-blue-500"
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
+          {/* Despesas Variáveis */}
+          <div className="bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 rounded-2xl shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md">
+            {/* Header Row 1 */}
+            <div className="bg-red-50 dark:bg-red-950/40 px-4 py-3 flex justify-between items-center text-red-800 dark:text-red-300 font-bold border-b border-red-100 dark:border-red-900/30">
+              <span className="text-sm font-display uppercase tracking-wide text-red-900 dark:text-red-250">Despesas Variáveis</span>
+              <span className="text-base font-mono text-red-950 dark:text-red-100">{fmtPercent(aggregatedMetrics.custosVariaveisTaxa)}</span>
+            </div>
+            {/* Header Row 2 */}
+            <div className="bg-stone-100 dark:bg-neutral-800/80 px-4 py-1.5 grid grid-cols-12 text-[10px] font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wide border-b border-stone-200 dark:border-neutral-800">
+              <span className="col-span-8">Descrição</span>
+              <span className="col-span-4 text-right">%</span>
+            </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase mb-1">
-                  CMV Meta (%)
-                </label>
-                <div className="relative rounded-lg shadow-sm">
-                  <input
-                    type="number"
-                    value={cmvMetaInput}
-                    onChange={(e) => setCmvMetaInput(e.target.value)}
-                    className="block w-full rounded-lg border border-stone-200 dark:border-neutral-800 bg-transparent py-2 pl-3 pr-8 text-sm focus:border-blue-500 focus:outline-none dark:focus:border-blue-500"
-                    placeholder="0.00"
-                  />
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                    <span className="text-stone-400 text-sm">%</span>
-                  </div>
-                </div>
-              </div>
+            {/* Table Body */}
+            <div className="p-3 space-y-1.5 max-h-[250px] overflow-y-auto">
+              {variableRecords.length === 0 ? (
+                <p className="text-xs text-stone-400 dark:text-stone-500 italic py-4 text-center">
+                  Nenhum custo variável lançado.
+                </p>
+              ) : (
+                activeRecords.map((item, idx) => {
+                  const isVarCat = categories.find(c => c.id === item.categoriaId)?.tipo === 'VARIABLE';
+                  if (!isVarCat) return null;
 
-              <div>
-                <label className="block text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase mb-1">
-                  Lucro Desejado (%)
-                </label>
-                <div className="relative rounded-lg shadow-sm">
-                  <input
-                    type="number"
-                    value={lucroMetaInput}
-                    onChange={(e) => setLucroMetaInput(e.target.value)}
-                    className="block w-full rounded-lg border border-stone-200 dark:border-neutral-800 bg-transparent py-2 pl-3 pr-8 text-sm focus:border-blue-500 focus:outline-none dark:focus:border-blue-500"
-                    placeholder="0.00"
-                  />
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                    <span className="text-stone-400 text-sm">%</span>
+                  return (
+                    <div key={idx} className="group grid grid-cols-12 gap-2 items-center hover:bg-stone-50 dark:hover:bg-neutral-800/40 p-1 rounded-lg transition-all duration-150">
+                      <input
+                        type="text"
+                        placeholder="Descrição da despesa variável"
+                        value={item.descricao}
+                        onChange={(e) => updateRecordRow(idx, 'descricao', e.target.value)}
+                        className="col-span-8 bg-transparent border border-transparent hover:border-stone-300 focus:border-stone-400 dark:hover:border-neutral-700 dark:focus:border-neutral-600 rounded-md py-1 px-2 text-xs focus:outline-none text-stone-800 dark:text-stone-200 focus:bg-white dark:focus:bg-neutral-950 transition-all font-medium"
+                      />
+                      
+                      <div className="col-span-3 relative rounded-md">
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="0,00"
+                          value={item.valor || ''}
+                          onChange={(e) => updateRecordRow(idx, 'valor', e.target.value)}
+                          className="w-full text-right bg-transparent border border-transparent hover:border-stone-300 focus:border-stone-400 dark:hover:border-neutral-700 dark:focus:border-neutral-600 rounded-md py-1 pl-1.5 pr-5 text-xs font-mono focus:outline-none text-stone-800 dark:text-stone-200 focus:bg-white dark:focus:bg-neutral-950 transition-all"
+                        />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-1.5">
+                          <span className="text-[10px] text-stone-400">%</span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => removeRecordRow(idx)}
+                        className="col-span-1 text-center text-[10px] opacity-0 group-hover:opacity-100 text-stone-400 hover:text-red-500 transition-all duration-150"
+                        title="Excluir despesa"
+                      >
+                        ❌
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="p-3 bg-stone-50 dark:bg-neutral-900/50 border-t border-stone-200 dark:border-neutral-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => addRecordRow('VARIABLE')}
+                className="px-2.5 py-1.5 rounded-lg border border-stone-200 dark:border-neutral-800 hover:bg-white dark:hover:bg-neutral-800 text-[10px] font-bold text-stone-600 dark:text-stone-300 shadow-sm transition-all"
+              >
+                ➕ Adicionar Despesa Variável
+              </button>
+            </div>
+          </div>
+
+          {/* Faturamento do Ano */}
+          <div className="bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 rounded-2xl shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md">
+            {/* Header */}
+            <div className="bg-stone-200 dark:bg-neutral-800 px-4 py-3 flex justify-between items-center text-stone-800 dark:text-stone-200 font-bold border-b border-stone-300 dark:border-neutral-700">
+              <span className="text-sm font-display uppercase tracking-wide">Faturamento do Ano</span>
+              <span className="text-xs text-stone-450 dark:text-stone-550 font-normal">Clique no mês para trabalhar</span>
+            </div>
+            {/* Header 2 */}
+            <div className="bg-stone-100 dark:bg-neutral-800/40 px-4 py-1 grid grid-cols-12 text-[10px] font-bold text-stone-500 uppercase tracking-wide border-b border-stone-200 dark:border-neutral-800">
+              <span className="col-span-8">Mês Faturamento</span>
+              <span className="col-span-4 text-right">R$</span>
+            </div>
+
+            {/* List */}
+            <div className="p-2 space-y-0.5">
+              {annualRevenuesState.map((r, index) => {
+                const isActive = r.mes === selectedMes;
+                return (
+                  <div 
+                    key={r.mes} 
+                    onClick={() => setSelectedMes(r.mes)}
+                    className={`grid grid-cols-12 gap-2 items-center p-1 rounded-lg transition-all duration-150 cursor-pointer ${
+                      isActive 
+                        ? 'bg-blue-50/50 dark:bg-blue-950/20 outline outline-1 outline-blue-400 dark:outline-blue-800' 
+                        : 'hover:bg-stone-50 dark:hover:bg-neutral-800/30'
+                    }`}
+                  >
+                    <span className="col-span-8 text-xs font-semibold text-stone-600 dark:text-stone-300 pl-2">
+                      {MONTHS[r.mes - 1]}
+                    </span>
+                    <div className="col-span-4 relative rounded-md" onClick={(e) => e.stopPropagation()}>
+                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-1.5">
+                        <span className="text-[10px] text-stone-400">R$</span>
+                      </div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="-"
+                        value={r.faturamento || ''}
+                        onChange={(e) => updateAnnualRevenueValue(index, e.target.value)}
+                        className={`w-full text-right bg-transparent border border-transparent hover:border-stone-300 focus:border-stone-400 dark:hover:border-neutral-700 dark:focus:border-neutral-600 rounded-md py-0.5 pl-5 pr-1.5 text-xs font-mono focus:outline-none ${
+                          isActive ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-stone-700 dark:text-stone-200'
+                        } focus:bg-white dark:focus:bg-neutral-950`}
+                      />
+                    </div>
                   </div>
-                </div>
+                );
+              })}
+
+              {/* Total Row */}
+              <div className="grid grid-cols-12 gap-2 items-center p-2 rounded-lg border-t border-stone-200 dark:border-neutral-800 font-bold bg-stone-50 dark:bg-neutral-950/50 mt-2">
+                <span className="col-span-7 text-xs text-stone-900 dark:text-stone-200">Total</span>
+                <span className="col-span-5 text-right text-xs font-mono text-stone-900 dark:text-stone-100">
+                  {fmtBRL(totalAnnualRevenueSum)}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Dynamic Costs Checklist */}
-          <div className="p-6 bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 rounded-2xl shadow-sm space-y-6">
-            
-            <div className="flex items-center justify-between border-b border-stone-200 dark:border-neutral-800 pb-3">
-              <div>
-                <h2 className="text-base font-semibold text-stone-900 dark:text-stone-200">
-                  💸 Lançamento Dinâmico de Custos
-                </h2>
-                <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
-                  Adicione e configure seus itens de custos fixos e taxas de cartão ou impostos.
-                </p>
-              </div>
-
-              {/* Toggle new category form */}
-              <button
-                type="button"
-                onClick={() => setIsCreatingCategory(!isCreatingCategory)}
-                className="px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-950/50 transition-colors"
-              >
-                {isCreatingCategory ? 'Fechar Nova Categoria' : '+ Nova Categoria'}
-              </button>
+          {/* Box Calculo para Despesas Variaveis */}
+          <div className="flex justify-between items-center bg-stone-50 dark:bg-neutral-950 border border-stone-200 dark:border-neutral-800 rounded-xl p-3.5 text-xs font-semibold text-stone-600 dark:text-stone-400">
+            <span>Calculo para Despesas Variáveis</span>
+            <div className="text-right">
+              <span className="block text-stone-400 text-[10px] font-mono">Total Base</span>
+              <span className="font-mono text-stone-800 dark:text-stone-200">100</span>
             </div>
-
-            {/* Inline creation form for category */}
-            {isCreatingCategory && (
-              <form onSubmit={handleCreateCategory} className="p-4 bg-stone-50 dark:bg-neutral-950 border border-stone-200 dark:border-neutral-800 rounded-xl space-y-3">
-                <p className="text-xs font-bold text-stone-500 uppercase tracking-wide">Nova Categoria de Despesa</p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <input
-                    type="text"
-                    required
-                    value={newCatNome}
-                    onChange={(e) => setNewCatNome(e.target.value)}
-                    placeholder="Nome (ex: Sacolas, Uber eats)"
-                    className="sm:col-span-2 block w-full rounded-lg border border-stone-200 dark:border-neutral-800 bg-transparent py-1.5 px-3 text-xs focus:border-blue-500 focus:outline-none dark:focus:border-blue-500"
-                  />
-                  <select
-                    value={newCatTipo}
-                    onChange={(e) => setNewCatTipo(e.target.value as CategoryType)}
-                    className="block w-full rounded-lg border border-stone-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 py-1.5 px-3 text-xs focus:border-blue-500 focus:outline-none dark:focus:border-blue-500"
-                  >
-                    <option value="FIXED">Fixa (R$)</option>
-                    <option value="VARIABLE">Variável (%)</option>
-                  </select>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsCreatingCategory(false)}
-                    className="px-3 py-1 rounded bg-stone-200 dark:bg-neutral-800 text-stone-600 dark:text-stone-300 text-xs hover:bg-stone-300 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-3 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700 transition-colors font-semibold"
-                  >
-                    Salvar Categoria
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* List records grouped by category */}
-            {categories.length === 0 ? (
-              <div className="text-center py-6 text-stone-400 text-sm">
-                Nenhuma categoria cadastrada. Crie uma acima para começar.
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {categories.map((category) => {
-                  const catRecords = records.filter(r => r.categoriaId === category.id);
-                  const isFixed = category.tipo === 'FIXED';
-                  
-                  return (
-                    <div
-                      key={category.id}
-                      className="border border-stone-100 dark:border-neutral-800/50 rounded-xl p-4 space-y-3 bg-stone-50/50 dark:bg-neutral-900/20"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm text-stone-800 dark:text-stone-200">
-                            {category.nome}
-                          </span>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            isFixed 
-                              ? 'bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400' 
-                              : 'bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400'
-                          }`}>
-                            {isFixed ? 'Custo Fixo (R$)' : 'Variável (%)'}
-                          </span>
-                        </div>
-                        
-                        <button
-                          type="button"
-                          onClick={() => addRecordRow(category.id)}
-                          className="px-2 py-1 rounded border border-stone-200 dark:border-neutral-800 hover:bg-stone-100 dark:hover:bg-neutral-800 text-xs font-medium text-stone-600 dark:text-stone-300 transition-colors"
-                        >
-                          + Adicionar Item
-                        </button>
-                      </div>
-
-                      {/* Records Rows */}
-                      {catRecords.length === 0 ? (
-                        <p className="text-[11px] text-stone-400 dark:text-stone-500 italic py-1">
-                          Nenhum lançamento nesta categoria para o mês.
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          {records.map((item, idx) => {
-                            if (item.categoriaId !== category.id) return null;
-
-                            return (
-                              <div key={idx} className="flex items-center gap-2">
-                                <input
-                                  type="text"
-                                  placeholder="Descrição do custo"
-                                  value={item.descricao}
-                                  onChange={(e) => updateRecordRow(idx, 'descricao', e.target.value)}
-                                  className="flex-1 rounded-lg border border-stone-200 dark:border-neutral-800 bg-transparent py-1 px-3 text-xs focus:border-blue-500 focus:outline-none dark:focus:border-blue-500"
-                                />
-                                
-                                <div className="relative rounded-lg shadow-sm w-36">
-                                  {isFixed && (
-                                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
-                                      <span className="text-stone-400 text-[10px]">R$</span>
-                                    </div>
-                                  )}
-                                  <input
-                                    type="number"
-                                    placeholder="0.00"
-                                    value={item.valor || ''}
-                                    onChange={(e) => updateRecordRow(idx, 'valor', e.target.value)}
-                                    className={`block w-full rounded-lg border border-stone-200 dark:border-neutral-800 bg-transparent py-1 text-xs focus:border-blue-500 focus:outline-none dark:focus:border-blue-500 ${
-                                      isFixed ? 'pl-7 pr-2.5' : 'pl-2.5 pr-6'
-                                    }`}
-                                  />
-                                  {!isFixed && (
-                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5">
-                                      <span className="text-stone-400 text-[10px]">%</span>
-                                    </div>
-                                  )}
-                                </div>
-
-                                <button
-                                  type="button"
-                                  onClick={() => removeRecordRow(idx)}
-                                  className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/30 text-stone-400 hover:text-red-500 transition-colors"
-                                  title="Remover linha"
-                                >
-                                  ❌
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Save Button */}
-            <div className="flex justify-end pt-2 border-t border-stone-200 dark:border-neutral-800">
-              <button
-                type="button"
-                disabled={isLoading}
-                onClick={handleSaveAll}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-sm transition-colors disabled:opacity-50"
-              >
-                {isLoading ? 'Salvando...' : 'Salvar Alterações'}
-              </button>
-            </div>
-
           </div>
 
         </div>
 
-        {/* Right Column: Composition Donut & Formulas summary */}
+        {/* COLUNA 3: Markup Card, Pie Chart & Métricas (Direita) */}
         <div className="space-y-6">
           
-          {/* Donut Pie Chart Card */}
-          <div className="p-6 bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 rounded-2xl shadow-sm space-y-4">
-            <h2 className="text-base font-semibold text-stone-900 dark:text-stone-200">
-              🍰 Composição Comercial
-            </h2>
-            <p className="text-xs text-stone-400 dark:text-stone-500">
-              Estrutura de preço baseada em faturamento de {fmtBRL(faturamentoValor)}.
-            </p>
+          {/* Markup Card */}
+          <div className="bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 rounded-2xl shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md">
+            {/* Header */}
+            <div className="bg-[#4f81bd] px-4 py-3 flex justify-between items-center text-white font-bold border-b border-[#3b6ea5]">
+              <span className="text-sm font-display uppercase tracking-wide">Mark up</span>
+              <span className="text-base font-mono">{markupValue > 0 ? markupValue.toFixed(2) : '-'}</span>
+            </div>
 
-            <div className="h-56 flex items-center justify-center">
+            <div className="p-4 space-y-4">
+              {/* Manual mode checkbox */}
+              <label className="flex items-center gap-2 bg-stone-50 dark:bg-neutral-950 p-2.5 rounded-xl border border-stone-100 dark:border-neutral-800/80 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useManualMarkup}
+                  onChange={(e) => toggleManualMarkup(e.target.checked)}
+                  className="rounded text-blue-600 focus:ring-blue-500 border-stone-300 dark:border-neutral-800"
+                />
+                <div className="text-left">
+                  <span className="block text-[11px] font-bold text-stone-700 dark:text-stone-300">Sobrescrever Métricas (Modo Manual)</span>
+                  <span className="block text-[9px] text-stone-400">Permite editar os percentuais e o Markup manualmente.</span>
+                </div>
+              </label>
+
+              {/* Input Fields */}
+              <div className="space-y-3">
+                {/* Lucro Desejado */}
+                <div className="flex justify-between items-center py-1 border-b border-stone-100 dark:border-neutral-800/50">
+                  <span className="text-xs text-stone-500 font-medium">Lucro Desejado</span>
+                  <div className="relative w-28">
+                    <input
+                      type="text"
+                      disabled={!useManualMarkup}
+                      value={lucroInput}
+                      onChange={(e) => handleLucroChange(e.target.value)}
+                      className={`w-full text-right bg-transparent border border-transparent rounded-md py-0.5 pl-1.5 pr-5 text-xs font-mono font-bold focus:outline-none focus:bg-stone-50 dark:focus:bg-neutral-950 text-blue-600 dark:text-blue-400 ${
+                        useManualMarkup ? 'hover:border-stone-300 dark:hover:border-neutral-800 cursor-text' : 'cursor-not-allowed opacity-80'
+                      }`}
+                    />
+                    <span className="absolute inset-y-0 right-1.5 flex items-center text-[10px] text-stone-400 font-mono">%</span>
+                  </div>
+                </div>
+
+                {/* Despesas Fixas */}
+                <div className="flex justify-between items-center py-1 border-b border-stone-100 dark:border-neutral-800/50">
+                  <span className="text-xs text-stone-500 font-medium">Despesas Fixas</span>
+                  <div className="relative w-28">
+                    <input
+                      type="text"
+                      disabled={!useManualMarkup}
+                      value={despesasFixasInput}
+                      onChange={(e) => handleDFChange(e.target.value)}
+                      className={`w-full text-right bg-transparent border border-transparent rounded-md py-0.5 pl-1.5 pr-5 text-xs font-mono font-bold focus:outline-none focus:bg-stone-50 dark:focus:bg-neutral-950 text-[#c00000] ${
+                        useManualMarkup ? 'hover:border-stone-300 dark:hover:border-neutral-800 cursor-text' : 'cursor-not-allowed opacity-80'
+                      }`}
+                    />
+                    <span className="absolute inset-y-0 right-1.5 flex items-center text-[10px] text-stone-400 font-mono">%</span>
+                  </div>
+                </div>
+
+                {/* Despesas Variaveis */}
+                <div className="flex justify-between items-center py-1 border-b border-stone-100 dark:border-neutral-800/50">
+                  <span className="text-xs text-stone-500 font-medium">Despesas Variáveis</span>
+                  <div className="relative w-28">
+                    <input
+                      type="text"
+                      disabled={!useManualMarkup}
+                      value={despesasVariaveisInput}
+                      onChange={(e) => handleDVChange(e.target.value)}
+                      className={`w-full text-right bg-transparent border border-transparent rounded-md py-0.5 pl-1.5 pr-5 text-xs font-mono font-bold focus:outline-none focus:bg-stone-50 dark:focus:bg-neutral-950 text-[#70ad47] ${
+                        useManualMarkup ? 'hover:border-stone-300 dark:hover:border-neutral-800 cursor-text' : 'cursor-not-allowed opacity-80'
+                      }`}
+                    />
+                    <span className="absolute inset-y-0 right-1.5 flex items-center text-[10px] text-stone-400 font-mono">%</span>
+                  </div>
+                </div>
+
+                {/* Custo Max c/ Producao - CMV */}
+                <div className="flex justify-between items-center py-1 border-b border-stone-100 dark:border-neutral-800/50">
+                  <span className="text-xs text-stone-500 font-medium">Custo Máx c/ Produção - CMV</span>
+                  <div className="relative w-28">
+                    <input
+                      type="text"
+                      disabled={!useManualMarkup}
+                      value={cmvInput}
+                      onChange={(e) => handleCmvChange(e.target.value)}
+                      className={`w-full text-right bg-transparent border border-transparent rounded-md py-0.5 pl-1.5 pr-5 text-xs font-mono font-bold focus:outline-none focus:bg-stone-50 dark:focus:bg-neutral-950 text-[#7030a0] ${
+                        useManualMarkup ? 'hover:border-stone-300 dark:hover:border-neutral-800 cursor-text' : 'cursor-not-allowed opacity-80'
+                      }`}
+                    />
+                    <span className="absolute inset-y-0 right-1.5 flex items-center text-[10px] text-stone-400 font-mono">%</span>
+                  </div>
+                </div>
+
+                {/* Multiplicador Markup */}
+                <div className="flex justify-between items-center py-1 border-b border-stone-100 dark:border-neutral-800/50">
+                  <span className="text-xs text-stone-500 font-medium font-bold">Multiplicador Markup</span>
+                  <div className="relative w-28">
+                    <input
+                      type="text"
+                      disabled={!useManualMarkup}
+                      value={markupInput}
+                      onChange={(e) => handleMarkupChange(e.target.value)}
+                      className={`w-full text-right bg-transparent border border-transparent rounded-md py-0.5 pl-1.5 pr-5 text-xs font-mono font-bold focus:outline-none focus:bg-stone-50 dark:focus:bg-neutral-950 text-stone-800 dark:text-stone-200 ${
+                        useManualMarkup ? 'hover:border-stone-300 dark:hover:border-neutral-800 cursor-text' : 'cursor-not-allowed opacity-80'
+                      }`}
+                    />
+                    <span className="absolute inset-y-0 right-1.5 flex items-center text-[10px] text-stone-400 font-mono">x</span>
+                  </div>
+                </div>
+
+                {/* Total */}
+                <div className="flex justify-between items-center py-2 font-bold text-stone-900 dark:text-stone-200 mt-2 bg-stone-50 dark:bg-neutral-950/30 p-1.5 rounded-lg">
+                  <span className="text-xs uppercase tracking-wide">Total</span>
+                  <span className={`text-xs font-mono ${Math.abs(totalPercent - 100) > 0.05 ? 'text-red-500' : 'text-stone-900 dark:text-stone-100'}`}>
+                    {fmtPercent(totalPercent)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Warnings */}
+              {Math.abs(totalPercent - 100) > 0.05 && (
+                <div className="p-2.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-xl text-[10px] text-amber-700 dark:text-amber-400 font-medium animate-pulse">
+                  ⚠️ A soma dos percentuais é de <strong>{totalPercent.toFixed(2)}%</strong>. O total ideal deve ser exatamente <strong>100,00%</strong>. Ajuste os valores para obter o equilíbrio comercial.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Gráfico de Composição (Percentual) */}
+          <div className="bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 rounded-2xl shadow-sm p-4 space-y-3 transition-all duration-300 hover:shadow-md">
+            <h2 className="text-center font-display text-xs font-bold text-stone-800 dark:text-stone-200 uppercase tracking-wider">
+              Composição da Margem (%)
+            </h2>
+
+            <div className="h-40 flex items-center justify-center">
               {pieData.length === 0 ? (
-                <div className="text-stone-400 text-xs italic">Preencha faturamento e custos para gerar o gráfico</div>
+                <div className="text-stone-400 text-xs italic">Aguardando dados...</div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -701,9 +1174,9 @@ export default function DespesasPage() {
                       data={pieData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={55}
-                      outerRadius={75}
-                      paddingAngle={2}
+                      innerRadius={40}
+                      outerRadius={58}
+                      paddingAngle={3}
                       dataKey="value"
                     >
                       {pieData.map((entry, index) => (
@@ -712,89 +1185,72 @@ export default function DespesasPage() {
                     </Pie>
                     <Tooltip 
                       formatter={(v: number) => `${v.toFixed(2)}%`}
-                      contentStyle={{ background: '#1c1917', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '11px' }}
+                      contentStyle={{ background: '#1c1917', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '10px' }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
               )}
             </div>
 
-            {/* Chart Legend */}
-            <div className="grid grid-cols-2 gap-2 text-xs pt-2">
-              {pieData.map((item) => (
-                <div key={item.name} className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                  <span className="text-stone-500 dark:text-stone-400 truncate" title={item.name}>
-                    {item.name}: <strong>{item.value.toFixed(1)}%</strong>
-                  </span>
-                </div>
-              ))}
+            {/* Custom Grid Legend */}
+            <div className="grid grid-cols-2 gap-2 text-[9px]">
+              <div className="flex items-center gap-1">
+                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#4f81bd' }} />
+                <span className="text-stone-500 dark:text-stone-400">Lucro: <strong>{lucroMetaValor.toFixed(2)}%</strong></span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#c00000' }} />
+                <span className="text-stone-500 dark:text-stone-400">Fixo: <strong>{dfPercent.toFixed(2)}%</strong></span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#70ad47' }} />
+                <span className="text-stone-500 dark:text-stone-400">Var.: <strong>{dvPercent.toFixed(2)}%</strong></span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#7030a0' }} />
+                <span className="text-stone-500 dark:text-stone-400">CMV: <strong>{cmvPercent.toFixed(2)}%</strong></span>
+              </div>
             </div>
           </div>
 
-          {/* Formulas Output / Calculations details */}
-          <div className="p-6 bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 rounded-2xl shadow-sm space-y-4">
-            <h2 className="text-base font-semibold text-stone-900 dark:text-stone-200">
-              🧮 Motor de Markup
+          {/* NOVAS MÉTRICAS: Painel de Indicadores Financeiros */}
+          <div className="bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 rounded-2xl shadow-sm p-4 space-y-3.5 transition-all duration-300 hover:shadow-md">
+            <h2 className="font-display text-xs font-bold text-stone-800 dark:text-stone-200 uppercase tracking-wider border-b border-stone-100 dark:border-neutral-850 pb-2">
+              📊 Indicadores de Viabilidade
             </h2>
-
-            <div className="space-y-3.5 text-xs">
-              <div className="flex justify-between items-center py-1.5 border-b border-stone-100 dark:border-neutral-800">
-                <span className="text-stone-500 dark:text-stone-400">Total Fixo (%DF)</span>
-                <span className="font-semibold text-stone-800 dark:text-stone-200">
-                  {financeCalculations.percentualDespesasFixas.toFixed(2)}%
-                </span>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-stone-50 dark:bg-neutral-950 p-2.5 rounded-xl border border-stone-100 dark:border-neutral-800">
+                <span className="block text-[9px] text-stone-400 font-bold uppercase">Margem Contribuição</span>
+                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 font-mono">{fmtPercent(activeMargemContrib)}</span>
               </div>
-              
-              <div className="flex justify-between items-center py-1.5 border-b border-stone-100 dark:border-neutral-800">
-                <span className="text-stone-500 dark:text-stone-400">Total Variável (%DV)</span>
-                <span className="font-semibold text-stone-800 dark:text-stone-200">
-                  {financeCalculations.percentualDespesasVariaveis.toFixed(2)}%
-                </span>
+              <div className="bg-stone-50 dark:bg-neutral-950 p-2.5 rounded-xl border border-stone-100 dark:border-neutral-800">
+                <span className="block text-[9px] text-stone-400 font-bold uppercase">Ponto de Equilíbrio</span>
+                <span className="text-sm font-bold text-stone-800 dark:text-stone-200 font-mono">{fmtBRL(activePontoEquilibrio)}</span>
               </div>
-
-              <div className="flex justify-between items-center py-1.5 border-b border-stone-100 dark:border-neutral-800">
-                <span className="text-stone-500 dark:text-stone-400">CMV Meta</span>
-                <span className="font-semibold text-stone-800 dark:text-stone-200">
-                  {cmvMetaValor.toFixed(2)}%
-                </span>
-              </div>
-
-              <div className="flex justify-between items-center py-1.5 border-b border-stone-100 dark:border-neutral-800">
-                <span className="text-stone-500 dark:text-stone-400">Lucro Desejado</span>
-                <span className="font-semibold text-stone-800 dark:text-stone-200">
-                  {lucroMetaValor.toFixed(2)}%
-                </span>
-              </div>
-
-              <div className="flex justify-between items-center py-1.5 border-b border-stone-100 dark:border-neutral-800">
-                <span className="text-stone-500 dark:text-stone-400">Divisor de Markup</span>
-                <span className={`font-semibold ${
-                  financeCalculations.insolvente ? 'text-red-500' : 'text-stone-800 dark:text-stone-200'
-                }`}>
-                  {financeCalculations.divisorMarkup.toFixed(4)}
-                </span>
-              </div>
-
-              <div className="flex justify-between items-center py-1.5 border-b border-stone-100 dark:border-neutral-800">
-                <span className="text-stone-500 dark:text-stone-400">Multiplicador Markup</span>
-                <span className="font-bold text-blue-600 dark:text-blue-400">
-                  {financeCalculations.insolvente ? 'N/A' : financeCalculations.multiplicadorMarkup.toFixed(2)}
+              <div className="bg-stone-50 dark:bg-neutral-950 p-2.5 rounded-xl border border-stone-100 dark:border-neutral-800 col-span-2">
+                <span className="block text-[9px] text-stone-400 font-bold uppercase">Lucro Líquido Estimado</span>
+                <span className={`text-base font-bold font-mono ${activeResultadoEstimado >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-500'}`}>
+                  {fmtBRLPrecise(activeResultadoEstimado)}
                 </span>
               </div>
             </div>
 
-            {financeCalculations.insolvente ? (
-              <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-xl text-[11px] text-red-600 dark:text-red-400 font-medium">
-                ⚠️ <strong>Ponto de Insolvência Atingido!</strong> A soma dos percentuais é de <strong>{financeCalculations.custosTotaisCalculados.toFixed(1)}%</strong> (excede 100%). Ajuste os custos, CMV ou reduza a meta de lucro.
+            <div className="text-[10px] text-stone-400 space-y-1.5 bg-stone-50/50 dark:bg-neutral-950/20 p-2.5 rounded-xl">
+              <div className="flex justify-between">
+                <span>Custo CMV Limite:</span>
+                <span className="font-mono font-semibold text-stone-600 dark:text-stone-300">{fmtBRLPrecise(activeCustoCmvEstimado)}</span>
               </div>
-            ) : (
-              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 rounded-xl text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                ✓ <strong>Precificação Viável!</strong> Multiplicador ideal de markup é <strong>{financeCalculations.multiplicadorMarkup.toFixed(2)}x</strong>. Para cada R$ 1,00 de CMV, cobre no mínimo {fmtBRL(financeCalculations.multiplicadorMarkup)}.
+              <div className="flex justify-between">
+                <span>Despesa Variável Limite:</span>
+                <span className="font-mono font-semibold text-stone-600 dark:text-stone-300">{fmtBRLPrecise(activeCustoVariavelEstimado)}</span>
               </div>
-            )}
+              <div className="flex justify-between">
+                <span>Despesa Fixa Absoluta:</span>
+                <span className="font-mono font-semibold text-stone-600 dark:text-stone-300">{fmtBRLPrecise(activeCustosFixos)}</span>
+              </div>
+            </div>
           </div>
-
         </div>
 
       </div>
