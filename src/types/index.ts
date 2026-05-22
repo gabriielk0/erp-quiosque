@@ -15,13 +15,25 @@ export interface ProdutoInsumo {
   quantidade: number; // em unidade básica
 }
 
+export interface MenuCategory {
+  id: string;
+  nome: string;
+}
+
 export interface Produto {
   id: string;
   nome: string;
-  categoria: string;
+  categoriaId: string;
+  categoria?: MenuCategory;
   descricao?: string;
   margemLucro: number; // %
-  precoVenda?: number; // override manual
+  precoVenda?: number | null; // override manual (salão)
+  isIfoodEnabled: boolean;
+  ifoodPrice?: number | null;
+  ifoodTax?: number | null;
+  ifoodAppCommission?: number | null;
+  ifoodCardFee?: number | null;
+  ifoodFixedDelivery?: number | null;
   ativo: boolean;
   insumos: ProdutoInsumo[];
   criadoEm: string;
@@ -53,4 +65,5 @@ export interface AppState {
   insumos: Insumo[];
   produtos: Produto[];
   vendas: Venda[];
+  categorias: MenuCategory[];
 }

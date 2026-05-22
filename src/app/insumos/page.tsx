@@ -58,45 +58,64 @@ export default function InsumosPage() {
         </button>
       </div>
 
-      {/* Form */}
+      {/* Modal Form */}
       {showForm && (
-        <div className="card p-6 space-y-4 animate-in">
-          <h2 className="font-semibold text-stone-800 dark:text-stone-200">{editing ? 'Editar' : 'Novo'} Insumo</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div className="col-span-2 md:col-span-1">
-              <label className="label">Nome *</label>
-              <input className="input" value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} placeholder="Ex: Arroz" />
-            </div>
-            <div>
-              <label className="label">Unidade de Medida</label>
-              <select className="input" value={form.unidadeMedida} onChange={e => setForm(f => ({ ...f, unidadeMedida: e.target.value as UnidadeMedida }))}>
-                {UNIDADES.map(u => <option key={u}>{u}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="label">Estoque Atual</label>
-              <input type="number" className="input" value={form.estoqueAtual} onChange={e => setForm(f => ({ ...f, estoqueAtual: +e.target.value }))} />
-            </div>
-            <div>
-              <label className="label">Custo da Embalagem (R$)</label>
-              <input type="number" step="0.01" className="input" value={form.custoEmbalagem} onChange={e => setForm(f => ({ ...f, custoEmbalagem: +e.target.value }))} placeholder="Ex: 25.00" />
-            </div>
-            <div>
-              <label className="label">Qtd. na Embalagem ({form.unidadeMedida})</label>
-              <input type="number" className="input" value={form.quantidadeEmbalagem} onChange={e => setForm(f => ({ ...f, quantidadeEmbalagem: +e.target.value }))} placeholder="Ex: 5000" />
-            </div>
-            <div className="flex items-end">
-              <div className="w-full p-3 bg-blue-50 dark:bg-blue-950 rounded-xl text-sm">
-                <span className="text-stone-500 dark:text-stone-400 block text-xs mb-0.5">Custo por {form.unidadeMedida}</span>
-                <span className="font-mono font-medium text-blue-700 dark:text-blue-300">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-5 relative animate-in zoom-in-95 duration-200">
+            <button 
+              onClick={() => { setShowForm(false); setEditing(null); }}
+              className="absolute top-4 right-4 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 text-lg p-1 transition-colors"
+              title="Fechar"
+            >
+              ✕
+            </button>
+            
+            <h2 className="font-display text-xl font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
+              {editing ? '📝 Editar Insumo' : '🌱 Novo Insumo'}
+            </h2>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <label className="label text-stone-500 dark:text-stone-400 font-semibold text-xs uppercase mb-1">Nome *</label>
+                <input className="input" value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} placeholder="Ex: Arroz" />
+              </div>
+              <div>
+                <label className="label text-stone-500 dark:text-stone-400 font-semibold text-xs uppercase mb-1">Unidade de Medida</label>
+                <select className="input" value={form.unidadeMedida} onChange={e => setForm(f => ({ ...f, unidadeMedida: e.target.value as UnidadeMedida }))}>
+                  {UNIDADES.map(u => <option key={u}>{u}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="label text-stone-500 dark:text-stone-400 font-semibold text-xs uppercase mb-1">Estoque Atual</label>
+                <input type="number" className="input" value={form.estoqueAtual} onChange={e => setForm(f => ({ ...f, estoqueAtual: +e.target.value }))} />
+              </div>
+              <div>
+                <label className="label text-stone-500 dark:text-stone-400 font-semibold text-xs uppercase mb-1">Custo da Embalagem (R$)</label>
+                <input type="number" step="0.01" className="input" value={form.custoEmbalagem} onChange={e => setForm(f => ({ ...f, custoEmbalagem: +e.target.value }))} placeholder="Ex: 25.00" />
+              </div>
+              <div>
+                <label className="label text-stone-500 dark:text-stone-400 font-semibold text-xs uppercase mb-1">Qtd. na Embalagem ({form.unidadeMedida})</label>
+                <input type="number" className="input" value={form.quantidadeEmbalagem} onChange={e => setForm(f => ({ ...f, quantidadeEmbalagem: +e.target.value }))} placeholder="Ex: 5000" />
+              </div>
+              <div className="sm:col-span-2 p-3.5 bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50 rounded-xl text-sm flex items-center justify-between">
+                <div>
+                  <span className="text-stone-400 dark:text-stone-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Custo Unitário Calculado</span>
+                  <span className="text-stone-500 dark:text-stone-400 text-xs">Custo por {form.unidadeMedida}</span>
+                </div>
+                <span className="font-mono font-bold text-base text-blue-600 dark:text-blue-400">
                   {form.quantidadeEmbalagem > 0 ? fmt(form.custoEmbalagem / form.quantidadeEmbalagem) : '—'}
                 </span>
               </div>
             </div>
-          </div>
-          <div className="flex gap-2 pt-2">
-            <button className="btn-primary" onClick={handleSubmit}>{editing ? 'Salvar' : 'Criar'}</button>
-            <button className="btn-ghost" onClick={() => { setShowForm(false); setEditing(null); }}>Cancelar</button>
+            
+            <div className="flex justify-end gap-2 pt-4 border-t border-stone-100 dark:border-neutral-800">
+              <button className="px-4 py-2 rounded-xl bg-stone-100 dark:bg-neutral-800 hover:bg-stone-200 dark:hover:bg-neutral-700 text-stone-700 dark:text-stone-300 font-semibold text-sm transition-colors" onClick={() => { setShowForm(false); setEditing(null); }}>
+                Cancelar
+              </button>
+              <button className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-sm transition-colors" onClick={handleSubmit}>
+                {editing ? 'Salvar' : 'Criar'}
+              </button>
+            </div>
           </div>
         </div>
       )}

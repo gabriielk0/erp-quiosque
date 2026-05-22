@@ -52,19 +52,33 @@ model Despesa {
   @@map("despesas")
 }
 
+// ─── CATEGORIAS DO CARDÁPIO ──────────────────────────────────────────────────
+model MenuCategory {
+  id       Int       @id @default(autoincrement())
+  nome     String    @unique
+  produtos Produto[]
+
+  @@map("menu_categories")
+}
+
 // ─── PRODUTOS / FICHAS TÉCNICAS ─────────────────────────────────────────────
 model Produto {
   id                  Int      @id @default(autoincrement())
   codigo              Int?     @unique               // código 100+ da planilha
   nome                String
-  categoria           String                          // "Salão", "Petisco", "iFood", "Embalagem"
+  categoriaId         Int
+  categoria           MenuCategory @relation(fields: [categoriaId], references: [id])
   descricao           String?
   rendimentoPorcoes   Decimal  @db.Decimal(10, 3)   @default(1)  // qtd de porções que a receita rende
   obsPorcao           String?
   margemSeguranca     Decimal? @db.Decimal(5, 2)                 // % (se null, usa padrão)
   precoVenda          Decimal? @db.Decimal(10, 2)               // preço praticado (salão)
-  precoIfood          Decimal? @db.Decimal(10, 2)               // preço praticado no iFood (pode diferir)
-  disponivelIfood     Boolean  @default(true)                   // se aparece no PDV iFood
+  isIfoodEnabled      Boolean  @default(false)                   // se disponível no iFood
+  ifoodPrice          Decimal? @db.Decimal(10, 2)               // preço praticado no iFood
+  ifoodTax            Decimal? @db.Decimal(5, 2)                 // taxa/imposto específico do iFood para este produto
+  ifoodAppCommission  Decimal? @db.Decimal(5, 2)                 // comissão do app iFood (%) específica para este produto
+  ifoodCardFee        Decimal? @db.Decimal(5, 2)                 // taxa de cartão iFood (%) específica para este produto
+  ifoodFixedDelivery  Decimal? @db.Decimal(10, 2)                // taxa de entrega fixa iFood (R$) específica para este produto
   ativo               Boolean  @default(true)
   criadoEm            DateTime @default(now())
   atualizadoEm        DateTime @updatedAt

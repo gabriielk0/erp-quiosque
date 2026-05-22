@@ -1,11 +1,30 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store-context';
-import type { ItemVenda } from '@/types';
+import type { ItemVenda, Produto } from '@/types';
 
 export default function PDVPage() {
   const { state, addVenda, precoFinal } = useAppStore();
   const [carrinho, setCarrinho] = useState<ItemVenda[]>([]);
+  const [ifoodConfig, setIfoodConfig] = useState({
+    imposto: 6.00,
+    comissaoApp: 12.00,
+    taxaCartao: 4.50,
+    recebidosLoja: 0.00,
+    custoEntrega: 9.58,
+    ticketMedio: 36.00,
+  });
+
+  useEffect(() => {
+    const stored = localStorage.getItem('ifoodConfig');
+    if (stored) {
+      try {
+        setIfoodConfig(JSON.parse(stored));
+      } catch (e) {
+        console.error('Error loading ifoodConfig:', e);
+      }
+    }
+  }, []);
   const [success, setSuccess] = useState(false);
   const [canal, setCanal] = useState<'salao' | 'ifood'>('salao');
   const [busca, setBusca] = useState('');
@@ -27,29 +46,31 @@ export default function PDVPage() {
   const fmt = (n: number) =>
     n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-  const categorias = Array.from(
-    new Set(
-      state.produtos
-        .filter((p) => p.ativo && p.categoria)
-        .map((p) => p.categoria),
-    ),
-  );
+  const categorias = state.categorias;
 
-  const getPreco = (produto: any) => {
-    if (
-      canal === 'ifood' &&
-      produto.precoIfood !== undefined &&
-      produto.precoIfood !== null
-    ) {
-      return Number(produto.precoIfood);
+  const getPreco = (produto: Produto) => {
+    if (canal === 'ifood') {
+      if (produto.ifoodPrice !== undefined && produto.ifoodPrice !== null) {
+        return Number(produto.ifoodPrice);
+      }
+      
+      const impostoItem = produto.ifoodTax !== undefined && produto.ifoodTax !== null ? produto.ifoodTax : ifoodConfig.imposto;
+      const comissaoAppItem = produto.ifoodAppCommission !== undefined && produto.ifoodAppCommission !== null ? produto.ifoodAppCommission : ifoodConfig.comissaoApp;
+      const taxaCartaoItem = produto.ifoodCardFee !== undefined && produto.ifoodCardFee !== null ? produto.ifoodCardFee : ifoodConfig.taxaCartao;
+      const custoEntregaItem = produto.ifoodFixedDelivery !== undefined && produto.ifoodFixedDelivery !== null ? produto.ifoodFixedDelivery : ifoodConfig.custoEntrega;
+
+      const D_rate = (impostoItem + comissaoAppItem + taxaCartaoItem + ifoodConfig.recebidosLoja) / 100;
+      const divisor = Math.max(0.1, 1 - D_rate);
+      const precoSugeridoIfood = (precoFinal(produto) + custoEntregaItem) / divisor;
+      return precoSugeridoIfood;
     }
     return precoFinal(produto);
   };
 
   const produtosAtivos = state.produtos.filter((p) => {
     if (!p.ativo) return false;
-    if (canal === 'ifood' && (p as any).disponivelIfood === false) return false;
-    if (categoriaFilter && p.categoria !== categoriaFilter) return false;
+    if (canal === 'ifood' && !p.isIfoodEnabled) return false;
+    if (categoriaFilter && p.categoriaId !== categoriaFilter) return false;
     if (busca && !p.nome.toLowerCase().includes(busca.toLowerCase()))
       return false;
     return true;
@@ -218,11 +239,11 @@ export default function PDVPage() {
               </button>
               {categorias.map((cat) => (
                 <button
-                  key={cat}
-                  onClick={() => setCategoriaFilter(cat)}
-                  className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${categoriaFilter === cat ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300' : 'bg-white border-stone-200 text-stone-600 hover:bg-stone-50 dark:bg-neutral-900 dark:border-neutral-800 dark:text-stone-400'}`}
+                  key={cat.id}
+                  onClick={() => setCategoriaFilter(cat.id)}
+                  className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${categoriaFilter === cat.id ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300' : 'bg-white border-stone-200 text-stone-600 hover:bg-stone-50 dark:bg-neutral-900 dark:border-neutral-800 dark:text-stone-400'}`}
                 >
-                  {cat}
+                  {cat.nome}
                 </button>
               ))}
             </div>
@@ -246,7 +267,7 @@ export default function PDVPage() {
                     <div className="flex items-start justify-between">
                       <div>
                         <span className="badge bg-stone-100 dark:bg-neutral-800 text-stone-500 text-xs mb-1">
-                          {p.categoria || '—'}
+                          {p.categoria?.nome || '—'}
                         </span>
                         <p className="font-semibold text-stone-900 dark:text-stone-100">
                           {p.nome}

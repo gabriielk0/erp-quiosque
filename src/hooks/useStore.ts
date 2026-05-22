@@ -1,11 +1,12 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import type { AppState, Insumo, Produto, Venda } from '@/types';
+import type { AppState, Insumo, Produto, Venda, MenuCategory } from '@/types';
 
 const defaultState: AppState = {
   insumos: [],
   produtos: [],
   vendas: [],
+  categorias: [],
 };
 
 async function fetchJson(url: string, options?: RequestInit) {
@@ -49,22 +50,44 @@ const mapInsumo = (raw: any): Insumo => ({
   criadoEm: String(raw.criadoEm),
 });
 
+const mapCategory = (raw: any): MenuCategory => ({
+  id: String(raw.id),
+  nome: raw.nome,
+});
+
 const mapProduto = (raw: any): Produto =>
   ({
     id: String(raw.id),
     nome: raw.nome,
-    categoria: raw.categoria ?? '',
+    categoriaId: String(raw.categoriaId),
+    categoria: raw.categoria ? mapCategory(raw.categoria) : undefined,
     descricao: raw.descricao ?? undefined,
     margemLucro: Number(raw.margemSeguranca ?? raw.margemLucro ?? 10),
     precoVenda:
       raw.precoVenda !== null && raw.precoVenda !== undefined
         ? Number(raw.precoVenda)
         : undefined,
-    precoIfood:
-      raw.precoIfood !== null && raw.precoIfood !== undefined
-        ? Number(raw.precoIfood)
+    isIfoodEnabled: Boolean(raw.isIfoodEnabled),
+    ifoodPrice:
+      raw.ifoodPrice !== null && raw.ifoodPrice !== undefined
+        ? Number(raw.ifoodPrice)
         : undefined,
-    disponivelIfood: raw.disponivelIfood ?? true,
+    ifoodTax:
+      raw.ifoodTax !== null && raw.ifoodTax !== undefined
+        ? Number(raw.ifoodTax)
+        : undefined,
+    ifoodAppCommission:
+      raw.ifoodAppCommission !== null && raw.ifoodAppCommission !== undefined
+        ? Number(raw.ifoodAppCommission)
+        : undefined,
+    ifoodCardFee:
+      raw.ifoodCardFee !== null && raw.ifoodCardFee !== undefined
+        ? Number(raw.ifoodCardFee)
+        : undefined,
+    ifoodFixedDelivery:
+      raw.ifoodFixedDelivery !== null && raw.ifoodFixedDelivery !== undefined
+        ? Number(raw.ifoodFixedDelivery)
+        : undefined,
     ativo: Boolean(raw.ativo),
     insumos: Array.isArray(raw.insumos)
       ? raw.insumos.map((item: any) => ({
@@ -73,7 +96,7 @@ const mapProduto = (raw: any): Produto =>
         }))
       : [],
     criadoEm: String(raw.criadoEm),
-  }) as any;
+  });
 
 const mapVenda = (raw: any): Venda =>
   ({
@@ -108,12 +131,16 @@ const prepareInsumoBody = (insumo: Omit<Insumo, 'id' | 'criadoEm'>) => ({
 
 const prepareProdutoBody = (produto: Omit<Produto, 'id' | 'criadoEm'>) => ({
   nome: produto.nome,
-  categoria: produto.categoria,
+  categoriaId: Number(produto.categoriaId),
   descricao: produto.descricao ?? null,
   margemSeguranca: produto.margemLucro,
   precoVenda: produto.precoVenda ?? null,
-  precoIfood: (produto as any).precoIfood ?? null,
-  disponivelIfood: (produto as any).disponivelIfood ?? true,
+  isIfoodEnabled: produto.isIfoodEnabled,
+  ifoodPrice: produto.ifoodPrice ?? null,
+  ifoodTax: produto.ifoodTax ?? null,
+  ifoodAppCommission: produto.ifoodAppCommission ?? null,
+  ifoodCardFee: produto.ifoodCardFee ?? null,
+  ifoodFixedDelivery: produto.ifoodFixedDelivery ?? null,
   ativo: produto.ativo,
   insumos: produto.insumos.map((item) => ({
     insumoId: Number(item.insumoId),
@@ -133,10 +160,11 @@ export function useStore() {
   useEffect(() => {
     async function load() {
       try {
-        const [insumos, produtos, vendas, cfg] = await Promise.all([
+        const [insumos, produtos, vendas, categorias, cfg] = await Promise.all([
           fetchJson('/api/insumos'),
           fetchJson('/api/produtos'),
           fetchJson('/api/vendas?limite=100'),
+          fetchJson('/api/categorias'),
           fetchJson('/api/configuracao').catch(() => null),
         ]);
 
@@ -152,6 +180,7 @@ export function useStore() {
           insumos: Array.isArray(insumos) ? insumos.map(mapInsumo) : [],
           produtos: Array.isArray(produtos) ? produtos.map(mapProduto) : [],
           vendas: Array.isArray(vendas) ? vendas.map(mapVenda) : [],
+          categorias: Array.isArray(categorias) ? categorias.map(mapCategory) : [],
         });
       } catch (error) {
         console.error('Falha ao carregar dados do servidor:', error);
@@ -246,16 +275,27 @@ export function useStore() {
       try {
         const body = {
           ...data,
-          margemSeguranca: data.margemLucro,
-          precoVenda: data.precoVenda ?? null,
-          precoIfood: (data as any).precoIfood ?? null,
-          disponivelIfood: (data as any).disponivelIfood ?? true,
+          categoriaId: data.categoriaId !== undefined ? Number(data.categoriaId) : undefined,
+          margemSeguranca: data.margemLucro !== undefined ? data.margemLucro : undefined,
+          precoVenda: data.precoVenda === undefined ? undefined : data.precoVenda,
+          isIfoodEnabled: data.isIfoodEnabled !== undefined ? data.isIfoodEnabled : undefined,
+          ifoodPrice: data.ifoodPrice === undefined ? undefined : data.ifoodPrice,
+          ifoodTax: data.ifoodTax === undefined ? undefined : data.ifoodTax,
+          ifoodAppCommission: data.ifoodAppCommission === undefined ? undefined : data.ifoodAppCommission,
+          ifoodCardFee: data.ifoodCardFee === undefined ? undefined : data.ifoodCardFee,
+          ifoodFixedDelivery: data.ifoodFixedDelivery === undefined ? undefined : data.ifoodFixedDelivery,
           insumos: data.insumos?.map((item) => ({
             insumoId: Number(item.insumoId),
             qtdBruta: item.quantidade,
           })),
         } as any;
         delete body.margemLucro;
+        delete body.categoria;
+        Object.keys(body).forEach((key) => {
+          if (body[key] === undefined) {
+            delete body[key];
+          }
+        });
 
         const updated = await fetchJson(`/api/produtos/${id}`, {
           method: 'PUT',
@@ -274,6 +314,63 @@ export function useStore() {
     },
     [],
   );
+
+  const addCategory = useCallback(
+    async (nome: string) => {
+      try {
+        const created = await fetchJson('/api/categorias', {
+          method: 'POST',
+          body: JSON.stringify({ nome }),
+        });
+        setState((prev) => ({
+          ...prev,
+          categorias: [...prev.categorias, mapCategory(created)],
+        }));
+      } catch (error) {
+        console.error('Erro ao criar categoria:', error);
+        throw error;
+      }
+    },
+    [],
+  );
+
+  const updateCategory = useCallback(
+    async (id: string, nome: string) => {
+      try {
+        const updated = await fetchJson(`/api/categorias/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ nome }),
+        });
+        const mappedCat = mapCategory(updated);
+        setState((prev) => ({
+          ...prev,
+          categorias: prev.categorias.map((item) =>
+            item.id === id ? mappedCat : item,
+          ),
+          produtos: prev.produtos.map((p) =>
+            p.categoriaId === id ? { ...p, categoria: mappedCat } : p
+          ),
+        }));
+      } catch (error) {
+        console.error('Erro ao atualizar categoria:', error);
+        throw error;
+      }
+    },
+    [],
+  );
+
+  const deleteCategory = useCallback(async (id: string) => {
+    try {
+      await fetchJson(`/api/categorias/${id}`, { method: 'DELETE' });
+      setState((prev) => ({
+        ...prev,
+        categorias: prev.categorias.filter((item) => item.id !== id),
+      }));
+    } catch (error) {
+      console.error('Erro ao excluir categoria:', error);
+      throw error;
+    }
+  }, []);
 
   const deleteProduto = useCallback(async (id: string) => {
     try {
@@ -416,6 +513,9 @@ export function useStore() {
     addProduto,
     updateProduto,
     deleteProduto,
+    addCategory,
+    updateCategory,
+    deleteCategory,
     addVenda,
     deleteVenda,
     custoUnitario,

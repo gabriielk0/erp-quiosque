@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
           if (produto) {
             if (item.precoUnitario === undefined || item.precoUnitario === null) {
               preco = canal === 'ifood'
-                ? Number(produto.precoIfood ?? produto.precoVenda ?? 0)
+                ? Number(produto.ifoodPrice ?? produto.precoVenda ?? 0)
                 : Number(produto.precoVenda ?? 0)
             }
             // Calcular snapshot do custo unitário de fabricação

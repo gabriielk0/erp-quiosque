@@ -5,6 +5,7 @@ export async function GET() {
   const produtos = await prisma.produto.findMany({
     where: { ativo: true },
     include: {
+      categoria: true,
       insumos: {
         include: { insumo: true },
       },
@@ -31,7 +32,10 @@ export async function POST(req: NextRequest) {
         })),
       },
     },
-    include: { insumos: { include: { insumo: true } } },
+    include: { 
+      categoria: true,
+      insumos: { include: { insumo: true } } 
+    },
   })
 
   return NextResponse.json(produto, { status: 201 })

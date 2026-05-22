@@ -21,7 +21,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         })),
       },
     },
-    include: { insumos: { include: { insumo: true } } },
+    include: { 
+      categoria: true,
+      insumos: { include: { insumo: true } } 
+    },
   })
 
   return NextResponse.json(produto)

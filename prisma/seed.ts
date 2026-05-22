@@ -304,7 +304,21 @@ async function main() {
     `✅ ${despesasFixas.length} despesas fixas + ${despesasVariaveis.length} variáveis inseridas`,
   );
 
-  // ─── 3. PRODUTOS + FICHAS TÉCNICAS ───────────────────────────────────────
+  // ─── 3. CATEGORIAS DO CARDÁPIO ───────────────────────────────────────────
+  const categoriasUnicas = ['Base', 'Salão', 'Petisco'];
+  const categoriasMap: Record<string, number> = {};
+
+  for (const catNome of categoriasUnicas) {
+    const cat = await prisma.menuCategory.upsert({
+      where: { nome: catNome },
+      update: {},
+      create: { nome: catNome },
+    });
+    categoriasMap[catNome] = cat.id;
+  }
+  console.log(`✅ ${categoriasUnicas.length} categorias de cardápio inseridas/verificadas`);
+
+  // ─── 4. PRODUTOS + FICHAS TÉCNICAS ───────────────────────────────────────
   // Primeiro inserimos os "insumos preparados" (cod 100+) como produtos
   // pois a planilha os usa como ingredientes em outras fichas
 
@@ -556,10 +570,31 @@ async function main() {
   for (const p of produtosData) {
     const { insumos: insumosReceita, ...produtoFields } = p;
 
+    // Resolve categoria
+    const catNome = (produtoFields as any).categoria;
+    const categoriaId = categoriasMap[catNome];
+    if (!categoriaId) {
+      throw new Error(`Categoria ${catNome} não encontrada no map`);
+    }
+
+    const isIfoodEnabled = (produtoFields as any).disponivelIfood ?? false;
+    const ifoodPrice = (produtoFields as any).precoIfood ?? null;
+
+    // clean up properties not defined in the new Produto model
+    const { categoria, precoIfood, disponivelIfood, ...cleanFields } = produtoFields as any;
+
+    const upsertData = {
+      ...cleanFields,
+      categoriaId,
+      isIfoodEnabled,
+      ifoodPrice,
+      ifoodTax: null, // default
+    };
+
     const produto = await prisma.produto.upsert({
       where: { codigo: p.codigo },
-      update: { ...produtoFields },
-      create: { ...produtoFields },
+      update: upsertData,
+      create: upsertData,
     });
 
     // remove ingredientes antigos antes de reinserir
