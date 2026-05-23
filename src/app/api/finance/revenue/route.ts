@@ -3,6 +3,12 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
+const noCacheHeaders = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  'Pragma': 'no-cache',
+  'Expires': '0',
+};
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -32,7 +38,7 @@ export async function GET(req: NextRequest) {
           despesasFixasMeta: revenue.despesasFixasMeta !== null ? Number(revenue.despesasFixasMeta) * 100 : null,
           despesasVariaveisMeta: revenue.despesasVariaveisMeta !== null ? Number(revenue.despesasVariaveisMeta) * 100 : null,
           markupMeta: revenue.markupMeta !== null ? Number(revenue.markupMeta) : null
-        });
+        }, { headers: noCacheHeaders });
       }
 
       return NextResponse.json({ 
@@ -45,7 +51,7 @@ export async function GET(req: NextRequest) {
         useManualMarkup: false, 
         ano, 
         mes 
-      });
+      }, { headers: noCacheHeaders });
     }
 
     const revenues = await prisma.monthlyRevenue.findMany({
@@ -65,7 +71,7 @@ export async function GET(req: NextRequest) {
       markupMeta: r.markupMeta !== null ? Number(r.markupMeta) : null
     }));
 
-    return NextResponse.json(mapped);
+    return NextResponse.json(mapped, { headers: noCacheHeaders });
   } catch (error: any) {
     console.error('Error fetching monthly revenue:', error);
     return NextResponse.json({ error: error.message || 'Erro ao buscar faturamentos' }, { status: 500 });

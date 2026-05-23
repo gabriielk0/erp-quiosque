@@ -3,6 +3,12 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
+const noCacheHeaders = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  'Pragma': 'no-cache',
+  'Expires': '0',
+};
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -31,7 +37,7 @@ export async function GET(req: NextRequest) {
       ]
     });
 
-    return NextResponse.json(records);
+    return NextResponse.json(records, { headers: noCacheHeaders });
   } catch (error: any) {
     console.error('Error fetching financial records:', error);
     return NextResponse.json({ error: error.message || 'Erro ao buscar lançamentos' }, { status: 500 });

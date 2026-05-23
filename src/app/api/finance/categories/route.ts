@@ -3,12 +3,18 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
+const noCacheHeaders = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  'Pragma': 'no-cache',
+  'Expires': '0',
+};
+
 export async function GET() {
   try {
     const categories = await prisma.expenseCategory.findMany({
       orderBy: { nome: 'asc' },
     });
-    return NextResponse.json(categories);
+    return NextResponse.json(categories, { headers: noCacheHeaders });
   } catch (error: any) {
     console.error('Error fetching categories:', error);
     return NextResponse.json({ error: error.message || 'Erro ao buscar categorias' }, { status: 500 });

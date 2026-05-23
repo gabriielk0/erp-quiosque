@@ -579,11 +579,6 @@ export default function ProdutosPage() {
                           <span className={`badge ${p.ativo ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600' : 'bg-stone-100 text-stone-500'}`}>
                             {p.ativo ? 'Ativo' : 'Inativo'}
                           </span>
-                          {p.isIfoodEnabled && (
-                            <span className="badge bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/20">
-                              🌐 iFood
-                            </span>
-                          )}
                         </div>
                         <h3 className="font-semibold text-stone-900 dark:text-stone-100 text-base">
                           {p.nome}
@@ -787,99 +782,103 @@ export default function ProdutosPage() {
                   <span className="text-sm font-semibold text-stone-700 dark:text-stone-300">Produto Ativo</span>
                 </label>
               </div>
-              <div>
-                <label className="label text-red-500 font-semibold text-xs uppercase mb-1">Preço Venda iFood (R$)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input border-red-100 dark:border-red-950/20 focus:border-red-500 focus:ring-red-500/20"
-                  value={form.ifoodPrice ?? ''}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      ifoodPrice: e.target.value ? +e.target.value : undefined,
-                    }))
-                  }
-                  placeholder={precoSugeridoIfoodModal > 0 ? `Sugerido: R$ ${precoSugeridoIfoodModal.toFixed(2)}` : 'Deixe vazio p/ sugerido'}
-                />
-              </div>
-              <div>
-                <label className="label text-red-500 font-semibold text-xs uppercase mb-1">Imposto iFood (%)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input border-red-100 dark:border-red-950/20 focus:border-red-500 focus:ring-red-500/20"
-                  value={form.ifoodTax ?? ''}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      ifoodTax: e.target.value ? +e.target.value : undefined,
-                    }))
-                  }
-                  placeholder="Usa global se vazio"
-                />
-              </div>
-              <div>
-                <label className="label text-red-500 font-semibold text-xs uppercase mb-1">Comissão APP (%)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input border-red-100 dark:border-red-950/20 focus:border-red-500 focus:ring-red-500/20"
-                  value={form.ifoodAppCommission ?? ''}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      ifoodAppCommission: e.target.value ? +e.target.value : undefined,
-                    }))
-                  }
-                  placeholder="Usa global se vazio"
-                />
-              </div>
-              <div>
-                <label className="label text-red-500 font-semibold text-xs uppercase mb-1">Taxa Cartão (%)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input border-red-100 dark:border-red-950/20 focus:border-red-500 focus:ring-red-500/20"
-                  value={form.ifoodCardFee ?? ''}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      ifoodCardFee: e.target.value ? +e.target.value : undefined,
-                    }))
-                  }
-                  placeholder="Usa global se vazio"
-                />
-              </div>
-              <div>
-                <label className="label text-red-500 font-semibold text-xs uppercase mb-1">Entrega Fixo (R$)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input border-red-100 dark:border-red-950/20 focus:border-red-500 focus:ring-red-500/20"
-                  value={form.ifoodFixedDelivery ?? ''}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      ifoodFixedDelivery: e.target.value ? +e.target.value : undefined,
-                    }))
-                  }
-                  placeholder="Usa global se vazio"
-                />
-              </div>
-              <div className="flex items-end pb-2 pl-1">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={form.isIfoodEnabled}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, isIfoodEnabled: e.target.checked }))
-                    }
-                    className="rounded border-stone-300 dark:border-neutral-800 text-red-600 focus:ring-red-500 h-4 w-4"
-                  />
-                  <span className="text-sm font-semibold text-stone-700 dark:text-stone-300">Disponível no iFood</span>
-                </label>
-              </div>
+              {activeTab === 'ifood' && (
+                <>
+                  <div>
+                    <label className="label text-red-500 font-semibold text-xs uppercase mb-1">Preço Venda iFood (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="input border-red-100 dark:border-red-950/20 focus:border-red-500 focus:ring-red-500/20"
+                      value={form.ifoodPrice ?? ''}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          ifoodPrice: e.target.value ? +e.target.value : undefined,
+                        }))
+                      }
+                      placeholder={precoSugeridoIfoodModal > 0 ? `Sugerido: R$ ${precoSugeridoIfoodModal.toFixed(2)}` : 'Deixe vazio p/ sugerido'}
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-red-500 font-semibold text-xs uppercase mb-1">Imposto iFood (%)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="input border-red-100 dark:border-red-950/20 focus:border-red-500 focus:ring-red-500/20"
+                      value={form.ifoodTax ?? ''}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          ifoodTax: e.target.value ? +e.target.value : undefined,
+                        }))
+                      }
+                      placeholder="Usa global se vazio"
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-red-500 font-semibold text-xs uppercase mb-1">Comissão APP (%)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="input border-red-100 dark:border-red-950/20 focus:border-red-500 focus:ring-red-500/20"
+                      value={form.ifoodAppCommission ?? ''}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          ifoodAppCommission: e.target.value ? +e.target.value : undefined,
+                        }))
+                      }
+                      placeholder="Usa global se vazio"
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-red-500 font-semibold text-xs uppercase mb-1">Taxa Cartão (%)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="input border-red-100 dark:border-red-950/20 focus:border-red-500 focus:ring-red-500/20"
+                      value={form.ifoodCardFee ?? ''}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          ifoodCardFee: e.target.value ? +e.target.value : undefined,
+                        }))
+                      }
+                      placeholder="Usa global se vazio"
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-red-500 font-semibold text-xs uppercase mb-1">Entrega Fixo (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="input border-red-100 dark:border-red-950/20 focus:border-red-500 focus:ring-red-500/20"
+                      value={form.ifoodFixedDelivery ?? ''}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          ifoodFixedDelivery: e.target.value ? +e.target.value : undefined,
+                        }))
+                      }
+                      placeholder="Usa global se vazio"
+                    />
+                  </div>
+                  <div className="flex items-end pb-2 pl-1">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={form.isIfoodEnabled}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, isIfoodEnabled: e.target.checked }))
+                        }
+                        className="rounded border-stone-300 dark:border-neutral-800 text-red-600 focus:ring-red-500 h-4 w-4"
+                      />
+                      <span className="text-sm font-semibold text-stone-700 dark:text-stone-300">Disponível no iFood</span>
+                    </label>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Ingredientes */}
@@ -949,7 +948,7 @@ export default function ProdutosPage() {
             </div>
 
             {/* Preview custos */}
-            <div className={`grid ${form.isIfoodEnabled ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-3'} gap-3 border-t border-stone-100 dark:border-neutral-850 pt-4`}>
+            <div className={`grid ${activeTab === 'ifood' && form.isIfoodEnabled ? 'grid-cols-3' : 'grid-cols-2'} gap-3 border-t border-stone-100 dark:border-neutral-850 pt-4`}>
               {[
                 {
                   label: 'Custo de Produção',
@@ -964,7 +963,7 @@ export default function ProdutosPage() {
                   bg: 'bg-blue-50 dark:bg-blue-950/20 border border-blue-100/60 dark:border-blue-900/30',
                 },
 
-                ...(form.isIfoodEnabled ? [
+                ...(activeTab === 'ifood' && form.isIfoodEnabled ? [
                   {
                     label: 'Preço iFood Final',
                     value: fmt(form.ifoodPrice ?? precoSugeridoIfoodModal),

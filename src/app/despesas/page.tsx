@@ -75,11 +75,13 @@ export default function DespesasPage() {
 
   // UI state
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetchingData, setIsFetchingData] = useState(true);
   const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error' | null, msg: string }>({ type: null, msg: '' });
   const [isChartsExpanded, setIsChartsExpanded] = useState(false);
 
   // 1. Fetch Categories and Revenues List (runs on load)
   async function loadMetadata() {
+    setIsFetchingData(true);
     try {
       const [catsRes, revsRes] = await Promise.all([
         fetch('/api/finance/categories', { cache: 'no-store' }),
@@ -117,11 +119,13 @@ export default function DespesasPage() {
       if (Array.isArray(revs)) setRevenuesList(revs);
     } catch (err) {
       console.error('Error loading metadata:', err);
+      setIsFetchingData(false);
     }
   }
 
   // 2. Fetch records for the selected Year
   async function loadYearData() {
+    setIsFetchingData(true);
     setIsLoading(true);
     setSaveStatus({ type: null, msg: '' });
     try {
@@ -144,6 +148,7 @@ export default function DespesasPage() {
       console.error('Error loading year data:', err);
     } finally {
       setIsLoading(false);
+      setIsFetchingData(false);
     }
   }
 
@@ -154,41 +159,49 @@ export default function DespesasPage() {
   useEffect(() => {
     if (categories.length > 0) {
       loadYearData();
+    } else {
+      setIsFetchingData(false);
     }
   }, [selectedAno, categories]);
 
   // 3. Build Active Records of the Month
   useEffect(() => {
+    if (isFetchingData) return;
     if (categories.length === 0) return;
     
     const fixedCat = categories.find(c => c.tipo === 'FIXED');
     const variableCat = categories.find(c => c.tipo === 'VARIABLE');
     if (!fixedCat || !variableCat) return;
 
-    const monthDbRecords = records.filter(r => r.ano === selectedAno && r.mes === selectedMes);
-    if (monthDbRecords.length > 0) {
-      setActiveRecords(monthDbRecords);
-    } else {
-      // Pre-populate with default template in memory
-      const defaults = [
-        ...DEFAULT_FIXED_EXPENSES.map(item => ({
+    const dbFixedRecords = records.filter(
+      r => r.ano === selectedAno && r.mes === selectedMes && r.categoriaId === fixedCat.id
+    );
+    const dbVariableRecords = records.filter(
+      r => r.ano === selectedAno && r.mes === selectedMes && r.categoriaId === variableCat.id
+    );
+
+    const finalFixed = dbFixedRecords.length > 0 
+      ? dbFixedRecords 
+      : DEFAULT_FIXED_EXPENSES.map(item => ({
           descricao: item.descricao,
           valor: item.valor,
           ano: selectedAno,
           mes: selectedMes,
           categoriaId: fixedCat.id
-        })),
-        ...DEFAULT_VARIABLE_EXPENSES.map(item => ({
+        }));
+
+    const finalVariable = dbVariableRecords.length > 0 
+      ? dbVariableRecords 
+      : DEFAULT_VARIABLE_EXPENSES.map(item => ({
           descricao: item.descricao,
           valor: item.valor,
           ano: selectedAno,
           mes: selectedMes,
           categoriaId: variableCat.id
-        }))
-      ];
-      setActiveRecords(defaults);
-    }
-  }, [records, selectedMes, selectedAno, categories]);
+        }));
+
+    setActiveRecords([...finalFixed, ...finalVariable]);
+  }, [records, selectedMes, selectedAno, categories, isFetchingData]);
 
   // 4. Build 12 months faturamento state
   const annualRevenues = useMemo(() => {
@@ -212,16 +225,11 @@ export default function DespesasPage() {
   }, [revenuesList, selectedAno]);
 
   // Tabela anual (Jan a Dez) de faturamento
-  const [annualRevenuesState, setAnnualRevenuesState] = useState<any[]>(annualRevenues);
+  const [annualRevenuesState, setAnnualRevenuesState] = useState<any[]>(() => annualRevenues);
 
-  const [prevRevenuesList, setPrevRevenuesList] = useState(revenuesList);
-  const [prevSelectedAno, setPrevSelectedAno] = useState(selectedAno);
-
-  if (revenuesList !== prevRevenuesList || selectedAno !== prevSelectedAno) {
-    setPrevRevenuesList(revenuesList);
-    setPrevSelectedAno(selectedAno);
+  useEffect(() => {
     setAnnualRevenuesState(annualRevenues);
-  }
+  }, [annualRevenues]);
 
   // 5. Input Handlers for active month list
   const addRecordRow = (tipo: CategoryType) => {
@@ -703,11 +711,11 @@ export default function DespesasPage() {
 
           <button
             type="button"
-            disabled={isLoading}
+            disabled={isLoading || isFetchingData}
             onClick={handleSaveAll}
             className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm transition-all hover:scale-[1.02] disabled:opacity-50 flex items-center gap-1.5"
           >
-            {isLoading ? 'Salvando...' : '💾 Salvar Alterações'}
+            {isLoading ? 'Salvando...' : isFetchingData ? 'Carregando...' : '💾 Salvar Alterações'}
           </button>
         </div>
       </div>
